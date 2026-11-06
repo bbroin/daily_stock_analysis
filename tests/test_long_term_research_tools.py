@@ -61,7 +61,7 @@ def test_company_history_uses_english_long_lookback_and_keeps_old_results():
     with patch("src.search_service.time.sleep"):
         results = _service(provider).search_company_history("PDN.AX", "Paladin Energy")
 
-    assert set(results) == {"leadership", "capital_allocation", "execution", "strategy"}
+    assert set(results) == {"current_leadership", "leadership", "capital_allocation", "execution", "strategy"}
     assert all(call["days"] == SearchService.COMPANY_HISTORY_LOOKBACK_DAYS for call in provider.calls)
     assert all("Paladin Energy" in call["query"] and "最新" not in call["query"] for call in provider.calls)
     # Old (2023) articles are not dropped by the news freshness window.
@@ -154,3 +154,14 @@ def test_new_tools_registered():
     registry = get_tool_registry()
     for name in ("get_annual_financials", "search_company_history"):
         assert registry.resolve(name) is not None
+
+
+def test_current_leadership_query_names_this_and_last_year():
+    from datetime import datetime
+
+    provider = _RecordingProvider()
+    with patch("src.search_service.time.sleep"):
+        _service(provider).search_company_history("PDN.AX", "Paladin Energy")
+    year = datetime.now().year
+    first = provider.calls[0]["query"]
+    assert "CEO" in first and str(year) in first and str(year - 1) in first

@@ -51,6 +51,8 @@ def test_explicit_selection_replaces_short_term_baseline():
     assert "Leadership track record scorecard" in state.skill_instructions
     assert "(background, unverified)" in state.skill_instructions
     assert "Background history (mandatory" in state.skill_instructions
+    assert "tool evidence ALWAYS" in state.skill_instructions
+    assert "(background, may be outdated)" in state.skill_instructions
 
 
 def test_localized_label():

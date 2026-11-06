@@ -318,7 +318,8 @@ def _handle_search_company_history(stock_code: str, stock_name: str) -> dict:
         "lookback_note": (
             "Results are not limited by the news freshness window. Most search "
             "providers only cover roughly the last year; older history must come "
-            "from background knowledge and be labelled unverified."
+            "from background knowledge and be labelled unverified. For who runs the company "
+            "now, current_leadership results override background knowledge."
         ),
         "dimensions": dimensions,
     }
@@ -326,7 +327,8 @@ def _handle_search_company_history(stock_code: str, stock_name: str) -> dict:
 
 search_company_history_tool = ToolDefinition(
     name="search_company_history",
-    description="Search a company's multi-year track record: leadership and board changes, "
+    description="Search a company's multi-year track record: current CEO/chair (this year and last), "
+                "leadership and board changes, "
                 "acquisitions/takeovers/capital raisings, project delays/cost overruns/"
                 "impairments, and current strategy. Use for long-term investor reviews; "
                 "not limited by the news freshness window. Not for indices/ETFs.",

@@ -68,9 +68,17 @@ instructions: |
   takeover offers received or made (accepted, rejected or withdrawn, and what the share price
   did afterwards), administration / recapitalisation / near-insolvency events, major
   acquisitions and divestments, large write-downs, project cost blow-outs or delays, major
-  equity raisings, and CEO / chair changes. Name the current CEO / managing director and
-  chair; if the tools do not show them, give the names you know with the unverified label
-  instead of saying they cannot be identified. If you genuinely know of no such event, say so.
+  equity raisings, and CEO / chair changes. If you genuinely know of no such event, say so.
+
+  **Current leadership (tool evidence first)**
+  - Name the current CEO / managing director and chair. Take them from the
+    `current_leadership` / `leadership` results of `search_company_history` (or the news)
+    whenever those show an appointment, departure or handover; tool evidence ALWAYS
+    overrides your background knowledge, and the most recent dated item wins.
+  - Your background knowledge of who runs a company can be out of date. If the tools show
+    nothing on leadership, give the names you know marked "(background, may be outdated)"
+    instead of saying they cannot be identified. Never present a remembered name as current
+    when a tool result shows a later change.
 
   **Leadership track record scorecard**
   Using `search_company_history`, `get_annual_financials` and the news, classify the
