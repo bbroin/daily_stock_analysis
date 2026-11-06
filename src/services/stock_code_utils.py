@@ -61,7 +61,7 @@ _SUFFIX_DIGIT_LENS: dict = {
     ".TW": (4, 5, 6),
 }
 
-_PRESERVE_SUFFIXES = {".T", ".KS", ".KQ", ".TW", ".TWO"}
+_PRESERVE_SUFFIXES = {".T", ".KS", ".KQ", ".TW", ".TWO", ".AX"}
 _US_INDEX_CODES = {
     "SPX",
     "^GSPC",
@@ -237,6 +237,8 @@ def _normalize_code_and_exchange(raw: str) -> tuple[Optional[str], str]:
         return None, explicit_exchange
     suffix_symbol = normalize_suffix_market_symbol(text)
     if suffix_symbol is not None:
+        if not explicit_exchange and get_suffix_market(suffix_symbol) == "au":
+            return suffix_symbol, "AX"
         return suffix_symbol, explicit_exchange
     if any(text.endswith(suffix) for suffix in _PRESERVE_SUFFIXES):
         return None, explicit_exchange
@@ -365,7 +367,7 @@ def resolve_daily_stock_identity(
         indexed_offshore = [
             (candidate, market)
             for candidate, market in indexed_identities
-            if market in {"jp", "kr", "tw"}
+            if market in {"jp", "kr", "tw", "au"}
         ]
         if trusted_market in {"jp", "kr", "tw"}:
             matching_candidates = [
@@ -455,7 +457,7 @@ def resolve_daily_stock_identity(
         candidates = [raw_code, normalized_code, refill_code]
         if suffix_base_lookup_allowed(normalized_code):
             candidates.append(normalized_code.rsplit(".", 1)[0])
-    if market not in {"jp", "kr", "tw"}:
+    if market not in {"jp", "kr", "tw", "au"}:
         for candidate in list(candidates):
             candidates.extend(
                 _build_market_code_variants(

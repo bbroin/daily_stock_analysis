@@ -78,6 +78,10 @@ _MARKET_ROLES = {
         "zh": "台股",
         "en": "Taiwan stock",
     },
+    "au": {
+        "zh": "澳股",
+        "en": "Australian (ASX) stock",
+    },
 }
 
 _MARKET_GUIDELINES = {
@@ -144,6 +148,21 @@ _MARKET_GUIDELINES = {
             "electronics-foundry supply chain, the three institutional investor groups (foreign / "
             "investment-trust / dealer), margin trading and day trading, and the TWSE/TPEx ±10% daily "
             "price limit; do not apply China A-share-specific concepts such as Northbound flows or Dragon Tiger lists."
+        ),
+    },
+    "au": {
+        "zh": (
+            "- 本次分析对象为 **澳股**（澳大利亚证券交易所 ASX 上市证券，Yahoo Finance 后缀 `.AX`），以澳元（AUD）计价。\n"
+            "- 请按澳大利亚市场语境分析，关注澳元汇率、澳洲储备银行（RBA）利率政策、大宗商品（铁矿石、锂、铀、黄金等）价格、"
+            "股息与franking抵免、半年报/季度报告披露周期；ASX 无涨跌停限制，采用 T+2 结算；"
+            "不要套用 A 股涨跌停、北向资金、龙虎榜、融资融券等 A 股专属概念。"
+        ),
+        "en": (
+            "- This analysis covers an **Australian stock** (listed on the ASX, Yahoo Finance suffix `.AX`), priced in AUD.\n"
+            "- Use Australian-market context: AUD FX, Reserve Bank of Australia (RBA) rate policy, commodity prices "
+            "(iron ore, lithium, uranium, gold, etc.), dividends and franking credits, and half-year/quarterly "
+            "reporting cycles; the ASX has no daily price limits and settles T+2. Do not apply China A-share concepts "
+            "such as daily price-limit boards, Northbound flows, Dragon Tiger lists, or margin-financing narratives."
         ),
     },
 }

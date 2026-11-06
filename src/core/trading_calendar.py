@@ -38,7 +38,7 @@ except ImportError:
     )
 
 # Market -> exchange code (exchange-calendars)
-MARKET_EXCHANGE = {"cn": "XSHG", "hk": "XHKG", "us": "XNYS", "jp": "XTKS", "kr": "XKRX", "tw": "XTAI"}
+MARKET_EXCHANGE = {"cn": "XSHG", "hk": "XHKG", "us": "XNYS", "jp": "XTKS", "kr": "XKRX", "tw": "XTAI", "au": "XASX"}
 
 # Market -> IANA timezone for "today"
 MARKET_TIMEZONE = {
@@ -48,6 +48,7 @@ MARKET_TIMEZONE = {
     "jp": "Asia/Tokyo",
     "kr": "Asia/Seoul",
     "tw": "Asia/Taipei",
+    "au": "Australia/Sydney",
 }
 
 # P0 market phase baseline (Issue #1386). This is an intentionally small
@@ -64,6 +65,8 @@ _CLOSING_AUCTION_WINDOW_MINUTES = {
     "jp": 5,
     "kr": 10,
     "tw": 5,
+    # au: ASX closing single price auction runs ~16:00-16:10.
+    "au": 10,
 }
 _SUPPORTED_ANALYSIS_PHASES = {
     "auto",
