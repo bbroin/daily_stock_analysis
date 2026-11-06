@@ -39,7 +39,10 @@ class Skill:
         category: Skill category — "trend" (趋势), "pattern" (形态), "reversal" (反转), "framework" (框架).
         core_rules: List of core trading rule numbers this strategy relates to (1-7).
         required_tools: List of tool names this skill depends on.
-        allowed_tools: Optional allowlist metadata from SKILL.md frontmatter.
+        allowed_tools: Optional allowlist metadata from SKILL.md frontmatter (metadata only,
+            never used for runtime tool selection).
+        agent_tool_allowlist: Runtime tool surface for the analysis agent, read only from
+            YAML strategy files (``agent_tool_allowlist``). Empty means the full tool surface.
         aliases: Optional alias phrases used by NL selectors / bot commands.
         enabled: Whether this skill is currently active.
         source: Origin of this skill — "builtin" or file path of a custom definition.
@@ -63,6 +66,7 @@ class Skill:
     core_rules: List[int] = field(default_factory=list)
     required_tools: List[str] = field(default_factory=list)
     allowed_tools: List[str] = field(default_factory=list)
+    agent_tool_allowlist: List[str] = field(default_factory=list)
     aliases: List[str] = field(default_factory=list)
     enabled: bool = False
     source: str = "builtin"
@@ -182,6 +186,7 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
         core_rules=data.get("core_rules", []) or [],
         required_tools=data.get("required_tools", []) or [],
         allowed_tools=_coerce_string_list(data.get("allowed_tools")),
+        agent_tool_allowlist=_coerce_string_list(data.get("agent_tool_allowlist")),
         aliases=_coerce_string_list(data.get("aliases")),
         enabled=False,
         source=str(filepath),

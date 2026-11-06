@@ -330,8 +330,58 @@ get_realtime_quote_tool = ToolDefinition(
 # get_daily_history
 # ============================================================
 
-def _handle_get_daily_history(stock_code: str, days: int = 60) -> dict:
-    """Get daily OHLCV history data."""
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _summarize_history_records(records: List[Dict[str, Any]], recent_closes: int = 20) -> Dict[str, Any]:
+    """Compact long-term price summary (52-week range, returns, drawdown) from daily rows."""
+    rows = [r for r in records if _safe_number(r.get("close")) is not None]
+    if not rows:
+        return {}
+    closes = [_safe_number(r.get("close")) for r in rows]
+    highs = [_safe_number(r.get("high")) or c for r, c in zip(rows, closes)]
+    lows = [_safe_number(r.get("low")) or c for r, c in zip(rows, closes)]
+    last = closes[-1]
+    window = min(len(rows), 252)
+    hi_idx = max(range(len(rows) - window, len(rows)), key=lambda i: highs[i])
+    lo_idx = min(range(len(rows) - window, len(rows)), key=lambda i: lows[i])
+
+    def _ret(n: int) -> Optional[float]:
+        if len(closes) <= n or not closes[-1 - n]:
+            return None
+        return round((last / closes[-1 - n] - 1.0) * 100.0, 2)
+
+    return {
+        "first_date": str(rows[0].get("date")),
+        "last_date": str(rows[-1].get("date")),
+        "trading_days": len(rows),
+        "last_close": last,
+        "high_52w": highs[hi_idx],
+        "high_52w_date": str(rows[hi_idx].get("date")),
+        "low_52w": lows[lo_idx],
+        "low_52w_date": str(rows[lo_idx].get("date")),
+        "drawdown_from_52w_high_pct": round((last / highs[hi_idx] - 1.0) * 100.0, 2) if highs[hi_idx] else None,
+        "return_pct": {"1m": _ret(21), "3m": _ret(63), "6m": _ret(126), "12m": _ret(min(251, len(closes) - 1))},
+        "recent_closes": [
+            {"date": str(r.get("date")), "close": c}
+            for r, c in zip(rows[-recent_closes:], closes[-recent_closes:])
+        ],
+    }
+
+
+def _safe_number(value: Any) -> Optional[float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if number != number else number
+
+
+def _handle_get_daily_history(stock_code: str, days: int = 60, summary: Any = False) -> dict:
+    """Get daily OHLCV history data (or a compact summary when ``summary`` is true)."""
     effective_days, metadata = _normalize_history_days(days)
 
     from src.services.history_loader import load_history_df
@@ -371,6 +421,16 @@ def _handle_get_daily_history(stock_code: str, days: int = 60) -> dict:
     if source == "db_cache" and records:
         response_code = records[-1].get("code") or response_code
 
+    if _coerce_bool(summary):
+        return _append_history_metadata({
+            "code": response_code,
+            "source": source,
+            "cache_hit": source == "db_cache",
+            "requested_days": effective_days,
+            "actual_records": len(records),
+            "summary": _summarize_history_records(records),
+        }, metadata)
+
     return _append_history_metadata({
         "code": response_code,
         "source": source,
@@ -400,6 +460,14 @@ get_daily_history_tool = ToolDefinition(
             description="Number of trading days to fetch (default: 60)",
             required=False,
             default=60,
+        ),
+        ToolParameter(
+            name="summary",
+            type="boolean",
+            description="If true, return a compact summary (52-week high/low, 1/3/6/12-month "
+                        "returns, drawdown, last 20 closes) instead of every daily row",
+            required=False,
+            default=False,
         ),
     ],
     handler=_handle_get_daily_history,

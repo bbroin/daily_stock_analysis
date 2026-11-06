@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [改进] 降低长期投资模式的 LLM 成本：YAML 策略新增 `agent_tool_allowlist`（仅当所有激活策略都声明时，分析 Agent 只暴露这些工具；SKILL.md 的 `allowed-tools` 仍只是元数据），`long_term_investor` 只用 7 个工具并在一步内并行取数；`get_daily_history` 新增可选 `summary` 参数，返回 52 周高低点 / 1-3-6-12 月收益 / 回撤 / 近 20 日收盘的紧凑摘要（默认行为不变）
 - [改进] `search_company_history` 新增 `current_leadership` 检索（查询带当年与上一年）；长期投资策略要求现任 CEO / 董事长以工具结果为准、覆盖模型背景知识，背景知识中的管理层姓名标注 may be outdated
 - [修复] 组合复盘 LLM 输出被截断：输出上限提高到 8192，按结尾免责声明检测是否完整，不完整时以 16384 重试一次，仍不完整则在邮件中显式提示，并记录 completion_tokens 便于排查
 - [修复] 非中文报告的财务摘要 / 股东回报金额改用币种前缀 + B/M/K（如 `A$15.61B`），时效性与阶段决策枚举值在展示层译为英文；英文报告邮件主题取报告一级标题，未自定义时发件人名改为 `Stock Analysis`（中文报告行为不变）
