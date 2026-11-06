@@ -110,7 +110,7 @@ def test_prompt_contains_code_computed_weights_and_language():
 
 
 def test_run_review_uses_llm_and_keeps_snapshot_when_llm_fails():
-    analyzer = MagicMock()
+    analyzer = MagicMock(spec=["is_available", "generate_text"])  # legacy analyzer without metadata API
     analyzer.is_available.return_value = True
     analyzer.generate_text.return_value = "## Strengths\n- Diversified core"
     content = run_portfolio_review("VAS.AX:100", analyzer=analyzer, market_data_fn=_market, fx_fn=_fx)
@@ -188,3 +188,43 @@ class TestMainHook:
 
         monkeypatch.setattr("src.services.portfolio_review_service.run_portfolio_review", boom)
         main._run_portfolio_review(self._config(), self._pipeline(), [], Namespace(no_notify=False))
+
+
+class _MetaAnalyzer:
+    """Analyzer exposing generate_text_with_metadata, returning queued texts."""
+
+    def __init__(self, texts):
+        self.texts = list(texts)
+        self.max_tokens_seen = []
+
+    def is_available(self):
+        return True
+
+    def generate_text_with_metadata(self, prompt, max_tokens=2048, temperature=0.7):
+        self.max_tokens_seen.append(max_tokens)
+        return SimpleNamespace(text=self.texts.pop(0), usage={"completion_tokens": 10}, model="m")
+
+
+def test_truncated_review_is_retried_with_larger_budget():
+    analyzer = _MetaAnalyzer([
+        "## Strengths\n- cut off mid sentence",
+        "## Strengths\n- full\n\nGeneral information only, not financial advice.",
+    ])
+    content = run_portfolio_review("VAS.AX:100", analyzer=analyzer, market_data_fn=_market, fx_fn=_fx)
+    assert analyzer.max_tokens_seen == [8192, 16384]
+    assert "- full" in content
+    assert "mid sentence" not in content
+    assert "was cut off" not in content
+
+
+def test_still_truncated_review_is_flagged_visibly():
+    analyzer = _MetaAnalyzer(["## Strengths\n- part one", "## Strengths\n- part two"])
+    content = run_portfolio_review("VAS.AX:100", analyzer=analyzer, market_data_fn=_market, fx_fn=_fx)
+    assert "part two" in content
+    assert "was cut off before it finished" in content
+
+
+def test_complete_review_is_not_retried():
+    analyzer = _MetaAnalyzer(["## Strengths\n- ok\n\nGeneral information only, not financial advice."])
+    run_portfolio_review("VAS.AX:100", analyzer=analyzer, market_data_fn=_market, fx_fn=_fx)
+    assert analyzer.max_tokens_seen == [8192]

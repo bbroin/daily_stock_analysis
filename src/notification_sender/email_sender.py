@@ -48,6 +48,10 @@ SMTP_CONFIGS = {
 }
 
 
+_DEFAULT_SENDER_NAME_ZH = 'daily_stock_analysis股票分析助手'
+_DEFAULT_SENDER_NAME_EN = 'Stock Analysis'
+
+
 class EmailSender:
     
     def __init__(self, config: Config):
@@ -64,6 +68,28 @@ class EmailSender:
             'receivers': config.email_receivers or ([config.email_sender] if config.email_sender else []),
         }
         self._stock_email_groups = getattr(config, 'stock_email_groups', None) or []
+        self._report_language = str(getattr(config, 'report_language', 'zh') or 'zh')
+        if (
+            self._report_language != 'zh'
+            and self._email_config['sender_name'] == _DEFAULT_SENDER_NAME_ZH
+        ):
+            self._email_config['sender_name'] = _DEFAULT_SENDER_NAME_EN
+
+    def _default_subject(self, content: Optional[str] = None) -> str:
+        """Default subject: unchanged for zh; for other languages use the report's first H1."""
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        if self._report_language == 'zh':
+            return f"📈 股票智能分析报告 - {date_str}"
+        for line in strip_hidden_markdown_metadata(content or "").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                heading = stripped[2:].replace("**", "").strip()
+                if heading:
+                    return heading if date_str in heading else f"{heading} - {date_str}"
+                break
+            if stripped:
+                break
+        return f"📈 Stock Analysis Report - {date_str}"
         
     def _is_email_configured(self) -> bool:
         """检查邮件配置是否完整（只需邮箱和授权码）"""
@@ -162,8 +188,7 @@ class EmailSender:
         try:
             # 生成主题
             if subject is None:
-                date_str = datetime.now().strftime('%Y-%m-%d')
-                subject = f"📈 股票智能分析报告 - {date_str}"
+                subject = self._default_subject(content)
 
             sanitized_content = strip_hidden_markdown_metadata(content).strip()
             
@@ -236,8 +261,7 @@ class EmailSender:
         receivers = receivers or self._email_config['receivers']
         server: Optional[smtplib.SMTP] = None
         try:
-            date_str = datetime.now().strftime('%Y-%m-%d')
-            subject = f"📈 股票智能分析报告 - {date_str}"
+            subject = self._default_subject()
             msg = MIMEMultipart('related')
             msg['Subject'] = Header(subject, 'utf-8')
             msg['From'] = self._format_sender_address(sender)

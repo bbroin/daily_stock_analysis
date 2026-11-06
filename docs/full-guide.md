@@ -1446,7 +1446,7 @@ TRADING_DAY_CHECK_ENABLED=false   # 月度定时日可能落在周末/假日
 - Agent 分支会预取约 240 个交易日历史，策略要求通过 `get_stock_info`（估值/成长/盈利/股息率）、`get_annual_financials`（约 4 个财年的年度利润表/资产负债表/现金流，含营收 CAGR、股本变化即稀释、净负债）、`search_company_history`（管理层变动、收购/要约/融资、项目延期/超支/减值、当前战略，不受新闻时效窗口限制）、`get_daily_history(days=250)`、`calculate_ma(periods="50,200")` 与 `search_stock_news` 取数。
 - 检查清单：业务类型、护城河与质量、财务实力、管理层资本配置、成长持续性、估值安全边际、市场特定因素（ASX：股息与 franking、AUD、RBA、大宗商品）、长期价格位置（仅作辅助）。
 - 管理层履历计分卡：把过往与当前的重大决策分为 ✅ 已兑现 / ❌ 失败或损害股东 / ⏳ 仍在进行，并判断现任管理层是否值得信任；写入推送报告中可见的 `positive_catalysts` / `risk_alerts` / `sentiment_summary` / `earnings_outlook` / `action_checklist`。
-- 证据标注：工具结果中的事实可直接引用；工具未覆盖的较早历史可来自模型背景知识，但必须标注“(background, unverified)”。
+- 证据标注：工具结果中的事实可直接引用；工具未覆盖的较早历史可来自模型背景知识，但必须标注“(background, unverified)”。策略要求必须覆盖近 5-10 年关键事件（要约收购、破产重整、大额减值、项目超支、大额融资、CEO/董事长变动）并写出现任 CEO 与董事长。
 - 报告 JSON 结构不变，仅改变字段含义：止损位改为“投资逻辑失效条件”，买点改为“安全边际下的增持区间”，操作建议按长期持有语义解读。
 - 限制：报告模板中的短期展望、狙击点位等字段仍会出现；数据质量取决于 YFinance（ASX 半年报在 Yahoo 上覆盖较稀疏），franking 信息不在工具数据中；多数搜索引擎的时间参数最长只到近一年（Tavily 通用检索不限时间），`search_company_history` 需要配置搜索 API Key；不读取交易所公告原文或年报 PDF。
 - 仓库自带的 `00-daily-analysis.yml` 已透传 `AGENT_SKILLS` / `NEWS_STRATEGY_PROFILE` / `NEWS_MAX_AGE_DAYS`，可直接在 Actions Variables 配置。
