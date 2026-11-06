@@ -463,7 +463,7 @@ class BacktestService:
         base, exchange = target.normalized_code, target.exchange
         if exchange in {"SH", "SZ", "BJ", "HK"}:
             expected = f"{exchange.lower()}{base}"
-        elif exchange in {"T", "KS", "KQ", "TW", "TWO"}:
+        elif exchange in {"T", "KS", "KQ", "TW", "TWO", "AX"}:
             expected = base
         elif exchange == "US":
             expected = base.upper().removesuffix(".US")

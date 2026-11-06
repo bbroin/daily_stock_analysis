@@ -2177,6 +2177,7 @@ class NotificationService(
         "CNY": "元",
         "RMB": "元",
         "CNH": "元",
+        "AUD": "澳元",
         "TWD": "新台币",  # 台股 (TWSE/TPEx) 以新台币计价，避免与 A 股「元」(人民币) 混淆
     }
 

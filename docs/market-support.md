@@ -122,6 +122,18 @@ PY
 
 回滚方式：移除 `tw` 市场识别、交易日历注册、YFinance 路由扩展、三大法人资料层/报告消费、TWD 标注、服务层/API 市场枚举及前端市场类型放行，并删除本文档中的能力声明。
 
+## 澳大利亚 ASX 个股支持（suffix-only）
+
+支持手动输入澳大利亚证券交易所（ASX）股票的 Yahoo Finance 后缀代码，例如 `BHP.AX`、`PDN.AX`、`4DX.AX`、`CBAPK.AX`，统一归入 `au` 市场标签。
+
+- **代码格式**：必须带 `.AX` 后缀；后缀前为 3–6 位字母或数字（ASX 代码为字母数字混合，不同于 JP/KR/TW 的纯数字代码）。大小写不敏感，`bhp.ax` 会规范为 `BHP.AX`。裸 `BHP` 仍按美股语义处理（即纽交所 BHP ADR）。
+- **数据路由**：日线与基础行情走 YFinance，`.AX` 代码原样传给 Yahoo Finance；主要指数为 S&P/ASX 200（`^AXJO`）与 All Ordinaries（`^AORD`）。数据可能延迟或缺字段，不承诺实时行情。
+- **交易日历**：注册 `au: XASX / Australia/Sydney`；收盘单一价格竞价（约 16:00–16:10）按 10 分钟启发式窗口建模。
+- **报告**：LLM prompt 使用澳股语境（AUD 汇率、RBA 利率政策、大宗商品价格、股息与 franking），金额标注为澳元（AUD）。
+- **边界**：大盘复盘 `MARKET_REVIEW_REGION=au`、Market Light 告警、ASX 股票索引/Web 自动补全尚未接入；Portfolio 与 JP/KR/TW 一样为 partial valuation。
+
+回滚方式：移除 `market_symbol_utils` 中的 `au` 规则及各处 `au` 市场枚举、交易日历注册、YFinance 路由与 ASX 指数，并删除本节。
+
 ## 日本/韩国 Portfolio 与 Market Light 边界（Issue #1815 Phase 3）
 
 Portfolio 允许 JP/KR 账户、交易和持仓快照进入现有链路，但会将账户/持仓快照标记为 `data_quality=partial`，并通过 `limitations` 明确 `realtime_quote_best_effort`、`fx_and_cost_basis_partial`、`sector_and_risk_metrics_limited`；不承诺 JPY/KRW 汇率、成本、市值、行业集中度或组合风险指标完整口径。
