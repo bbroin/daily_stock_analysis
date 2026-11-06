@@ -30,7 +30,11 @@ def test_skill_file_loads_and_is_opt_in():
     for tool in ("get_stock_info", "get_annual_financials", "search_company_history",
                  "get_daily_history", "calculate_ma", "search_stock_news"):
         assert tool in skill.required_tools
-    assert skill.allowed_tools == []  # must not restrict the agent's tool surface
+    # A small explicit tool surface keeps each agent step cheap (all schemas are re-sent per step).
+    assert skill.allowed_tools == []  # SKILL.md-style metadata stays unused
+    assert "get_annual_financials" in skill.agent_tool_allowlist
+    assert "get_chip_distribution" not in skill.agent_tool_allowlist
+    assert set(skill.required_tools) <= set(skill.agent_tool_allowlist)
 
 
 def test_default_selection_is_unchanged():
@@ -47,6 +51,8 @@ def test_explicit_selection_replaces_short_term_baseline():
     assert state.use_legacy_default_prompt is False
     assert "Moat and quality" in state.skill_instructions
     assert "Thesis invalidation" in state.skill_instructions
+    assert "Workflow override for this skill" in state.skill_instructions
+    assert "summary=true" in state.skill_instructions
     assert "MA5 > MA10" not in state.skill_instructions
     assert "Leadership track record scorecard" in state.skill_instructions
     assert "(background, unverified)" in state.skill_instructions

@@ -550,6 +550,44 @@ def resolve_skill_prompt_state(config=None, skills: Optional[List[str]] = None) 
     )
 
 
+def _restrict_registry_to_skill_allowlist(registry, skill_manager, skill_names: List[str]):
+    """Return a registry limited to the union of the active skills' ``agent_tool_allowlist``.
+
+    SKILL.md ``allowed-tools`` stays metadata only and is never consulted here.
+    Applies only when EVERY active skill declares a non-empty ``agent_tool_allowlist``
+    list, so default/mixed selections keep the full tool surface unchanged.
+    Unknown tool names are ignored; if none resolve, the original registry is kept.
+    """
+    if not skill_names or skill_manager is None or registry is None:
+        return registry
+    allowed: List[str] = []
+    for name in skill_names:
+        getter = getattr(skill_manager, "get", None)
+        skill = getter(name) if callable(getter) else None
+        tools = list(getattr(skill, "agent_tool_allowlist", None) or [])
+        if not tools:
+            return registry
+        for tool in tools:
+            if tool not in allowed:
+                allowed.append(tool)
+
+    from src.agent.tools.registry import ToolRegistry as _TR
+
+    filtered = _TR(category_timeout_map=getattr(registry, "category_timeout_map", None))
+    for tool_name in allowed:
+        tool_def = registry.get(tool_name)
+        if tool_def is not None:
+            filtered.register(tool_def)
+    if not filtered.list_names():
+        return registry
+    logger.info(
+        "[AgentFactory] Tool surface restricted by skill agent_tool_allowlist: %d -> %d tools",
+        len(registry.list_names()),
+        len(filtered.list_names()),
+    )
+    return filtered
+
+
 def build_agent_executor(config=None, skills: Optional[List[str]] = None):
     """Build and return a configured AgentExecutor (or future orchestrator).
 
@@ -602,6 +640,12 @@ def build_agent_executor(config=None, skills: Optional[List[str]] = None):
         )
 
     from src.agent.executor import AgentExecutor
+    # YAML strategies that declare ``agent_tool_allowlist`` (e.g. long_term_investor) get only
+    # those tools: every agent step re-sends all tool schemas, so a ~90-tool
+    # surface costs tens of thousands of input tokens per step.
+    registry = _restrict_registry_to_skill_allowlist(
+        registry, skill_manager, prompt_state.skills_to_activate
+    )
     # Intentionally do not mutate config routing fields here. We only coerce
     # execution params (max_steps/timeout_seconds) from config values; provider,
     # model, base URL and channel routes stay unchanged and are consumed by

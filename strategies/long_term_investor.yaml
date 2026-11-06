@@ -21,6 +21,16 @@ required_tools:
   - calculate_ma
   - search_stock_news
   - get_realtime_quote
+# Only these tools are offered to the agent when this skill is the sole active skill.
+# Every agent step re-sends all tool schemas, so a small surface keeps runs cheap.
+agent_tool_allowlist:
+  - get_realtime_quote
+  - get_daily_history
+  - calculate_ma
+  - get_stock_info
+  - get_annual_financials
+  - search_company_history
+  - search_stock_news
 aliases: [长期投资, 价值投资, 长线, long term, long-term investor, buffett]
 default_active: false
 default_router: false
@@ -35,25 +45,30 @@ instructions: |
   (MA5 bias / "never chase", chip structure, intraday phase timing, capital-flow scalping)
   are NOT the decision basis here; use price data only as secondary context.
 
-  **Data to gather (in addition to the standard workflow)**
-  - `get_stock_info`: valuation (P/E, P/B, market cap), growth (revenue / earnings YoY),
-    earnings quality (ROE, margins), dividend yield.
+  **Workflow override for this skill (replaces the staged workflow above)**
+  Ignore the four-stage tool sequence in the general workflow. In your FIRST step, request
+  ALL of the following tool calls together, in parallel; then write the final report in your
+  second step. Only make an extra tool call if a result failed or is essential and missing.
+  Technical-indicator and chip tools are not used in this review (chip data is not
+  available for most non-A-share markets).
   - `get_annual_financials` (default 4 fiscal years): multi-year revenue, profit, cash flow,
     capex, debt, cash, share count, share issuance and dividends. Use `derived` for revenue
     CAGR, share-count change (dilution) and net debt. If `status` is not "ok", say the
     multi-year history could not be verified.
-  - `search_company_history`: leadership / board changes, acquisitions, takeover offers,
-    capital raisings, project delays, cost overruns, impairments and current strategy. Most
-    search providers only reach back about a year.
-  - `get_daily_history` with `days=250` (about one year): 52-week high/low, 12-month return,
-    drawdown from the 52-week high.
-  - `calculate_ma` with `periods="50,200"` and `days=250`: long-term trend context only.
+  - `search_company_history`: current leadership, leadership / board changes, acquisitions,
+    takeover offers, capital raisings, project delays, cost overruns, impairments and current
+    strategy. Most search providers only reach back about a year.
   - `search_stock_news`: material events since the last review — results and guidance,
     capital raises / placements, acquisitions or divestments, dividend changes, management or
     board changes, regulatory or legal issues.
+  - `get_daily_history` with `days=250` and `summary=true`: 52-week high/low, 1/3/6/12-month
+    returns and drawdown from the 52-week high (a compact summary, not every daily row).
+  - `calculate_ma` with `periods="50,200"` and `days=250`: long-term trend context only.
+  - `get_stock_info`: valuation (P/E, P/B, market cap), growth, earnings quality (ROE,
+    margins) and dividend yield.
+  - The latest quote is usually already in the context; call `get_realtime_quote` only if it
+    is missing.
   - If a field is missing, say so explicitly and lower confidence. Never invent numbers.
-  - These calls are independent: request them together in the same step to stay within the
-    step budget.
 
   **Evidence labelling (mandatory)**
   - Facts from tool results may be stated directly; cite the period or the source name.

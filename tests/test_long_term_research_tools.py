@@ -165,3 +165,78 @@ def test_current_leadership_query_names_this_and_last_year():
     year = datetime.now().year
     first = provider.calls[0]["query"]
     assert "CEO" in first and str(year) in first and str(year - 1) in first
+
+
+def test_history_summary_mode_is_compact_and_correct():
+    from src.agent.tools.data_tools import _summarize_history_records
+
+    records = [
+        {"date": f"2026-01-{(i % 28) + 1:02d}", "close": 10.0 + i, "high": 10.5 + i, "low": 9.5 + i}
+        for i in range(260)
+    ]
+    records[100]["high"] = 999.0
+    summary = _summarize_history_records(records)
+    assert summary["last_close"] == 269.0
+    assert summary["high_52w"] == 999.0
+    assert summary["low_52w"] == records[8]["low"]  # window is the last 252 rows
+    assert summary["drawdown_from_52w_high_pct"] == round((269.0 / 999.0 - 1) * 100, 2)
+    assert summary["return_pct"]["1m"] == round((269.0 / 248.0 - 1) * 100, 2)
+    assert len(summary["recent_closes"]) == 20
+    assert _summarize_history_records([]) == {}
+
+
+def test_daily_history_summary_flag_replaces_rows():
+    from src.agent.tools import data_tools
+
+    df = pd.DataFrame(
+        {"date": pd.date_range("2025-01-01", periods=30), "close": range(30), "high": range(30), "low": range(30)}
+    )
+    with patch("src.services.history_loader.load_history_df", return_value=(df, "db_cache")):
+        full = data_tools._handle_get_daily_history("PDN.AX", days=30)
+        compact = data_tools._handle_get_daily_history("PDN.AX", days=30, summary=True)
+    assert len(full["data"]) == 30 and "summary" not in full
+    assert "data" not in compact and compact["summary"]["trading_days"] == 30
+
+
+def test_skill_allowlist_restricts_tool_surface_only_when_all_skills_declare_it():
+    from types import SimpleNamespace
+
+    from src.agent.factory import _restrict_registry_to_skill_allowlist, get_tool_registry
+
+    registry = get_tool_registry()
+    skills = {
+        "lt": SimpleNamespace(agent_tool_allowlist=["get_annual_financials", "search_company_history", "no_such_tool"]),
+        "open": SimpleNamespace(agent_tool_allowlist=[]),
+        # SKILL.md allowed-tools is metadata only and must not restrict tools.
+        "bundle": SimpleNamespace(allowed_tools=["get_annual_financials"], agent_tool_allowlist=[]),
+    }
+    manager = SimpleNamespace(get=skills.get)
+
+    restricted = _restrict_registry_to_skill_allowlist(registry, manager, ["lt"])
+    assert sorted(restricted.list_names()) == ["get_annual_financials", "search_company_history"]
+    assert restricted.category_timeout_map == registry.category_timeout_map
+    # Mixed selection (one skill without an allowlist) keeps the full surface.
+    assert _restrict_registry_to_skill_allowlist(registry, manager, ["lt", "open"]) is registry
+    assert _restrict_registry_to_skill_allowlist(registry, manager, []) is registry
+    assert _restrict_registry_to_skill_allowlist(registry, manager, ["bundle"]) is registry
+
+
+def test_long_term_skill_executor_gets_small_tool_surface():
+    from types import SimpleNamespace
+
+    from src.agent.factory import build_agent_executor
+
+    config = SimpleNamespace(
+        agent_skills=["long_term_investor"], agent_skill_dir=None, agent_arch="single",
+        agent_max_steps=10, agent_orchestrator_timeout_s=0,
+    )
+    with patch("src.agent.llm_adapter.LLMToolAdapter.__init__", return_value=None):
+        try:
+            executor = build_agent_executor(config, ["long_term_investor"])
+        except Exception as exc:  # pragma: no cover - environment-specific config needs
+            pytest.skip(f"executor build needs full config: {exc}")
+    names = set(executor.tool_registry.list_names())
+    assert names == {
+        "get_realtime_quote", "get_daily_history", "calculate_ma", "get_stock_info",
+        "get_annual_financials", "search_company_history", "search_stock_news",
+    }
