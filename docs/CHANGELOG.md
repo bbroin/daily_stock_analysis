@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [改进] `search_company_history` 新增 `current_leadership` 检索（查询带当年与上一年）；长期投资策略要求现任 CEO / 董事长以工具结果为准、覆盖模型背景知识，背景知识中的管理层姓名标注 may be outdated
 - [修复] 组合复盘 LLM 输出被截断：输出上限提高到 8192，按结尾免责声明检测是否完整，不完整时以 16384 重试一次，仍不完整则在邮件中显式提示，并记录 completion_tokens 便于排查
 - [修复] 非中文报告的财务摘要 / 股东回报金额改用币种前缀 + B/M/K（如 `A$15.61B`），时效性与阶段决策枚举值在展示层译为英文；英文报告邮件主题取报告一级标题，未自定义时发件人名改为 `Stock Analysis`（中文报告行为不变）
 - [改进] 长期投资策略强制补充近 5-10 年关键事件（要约收购、破产重整、大额减值、超支、融资、管理层变动）与现任 CEO / 董事长姓名，来自模型背景知识时标注未验证

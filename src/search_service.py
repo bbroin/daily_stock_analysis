@@ -4648,12 +4648,13 @@ class SearchService:
         self,
         stock_code: str,
         stock_name: str,
-        max_searches: int = 4,
+        max_searches: int = 5,
     ) -> Dict[str, SearchResponse]:
         """
         公司历史与管理层履历检索（长期投资视角）
 
         检索维度：
+        0. current_leadership - 当前 CEO/董事长（查询带当年与上一年，降低模型用过时背景知识的概率）
         1. leadership - 管理层/董事会变动与任职经历
         2. capital_allocation - 收购、要约、融资、增发稀释
         3. execution - 项目延期、超支、减值、业绩指引兑现
@@ -4668,10 +4669,12 @@ class SearchService:
         if self.is_index_or_etf(stock_code, stock_name):
             return {}
 
+        this_year = datetime.now().year
         if self._is_foreign_stock(stock_code):
             english_aliases = self._foreign_english_query_terms(stock_code, stock_name)
             name = english_aliases[0] if english_aliases else stock_name
             search_dimensions = [
+                ('current_leadership', f"{name} CEO managing director appointed {this_year} {this_year - 1}"),
                 ('leadership', f"{name} CEO managing director chairman board appointment resignation track record"),
                 ('capital_allocation', f"{name} acquisition takeover offer capital raising placement share issue"),
                 ('execution', f"{name} project delay cost overrun impairment write-down guidance"),
@@ -4680,6 +4683,7 @@ class SearchService:
         else:
             name = stock_name
             search_dimensions = [
+                ('current_leadership', f"{name} 董事长 总经理 任命 {this_year}年 {this_year - 1}年"),
                 ('leadership', f"{name} 董事长 总经理 管理层 变动 任职经历"),
                 ('capital_allocation', f"{name} 收购 并购 定增 募资 增发"),
                 ('execution', f"{name} 项目 延期 超支 商誉减值 业绩 不及预期"),
