@@ -61,6 +61,17 @@ instructions: |
     but every such statement MUST end with "(background, unverified)". Never present a
     remembered figure, date or name as verified, and never invent one.
 
+  **Background history (mandatory, do not skip)**
+  Search results usually cover only about the last year, so you MUST also draw on your
+  background knowledge for the company's defining events of the last 5-10 years, labelled
+  "(background, unverified)". Always check for and include, when you know of them:
+  takeover offers received or made (accepted, rejected or withdrawn, and what the share price
+  did afterwards), administration / recapitalisation / near-insolvency events, major
+  acquisitions and divestments, large write-downs, project cost blow-outs or delays, major
+  equity raisings, and CEO / chair changes. Name the current CEO / managing director and
+  chair; if the tools do not show them, give the names you know with the unverified label
+  instead of saying they cannot be identified. If you genuinely know of no such event, say so.
+
   **Leadership track record scorecard**
   Using `search_company_history`, `get_annual_financials` and the news, classify the
   company's major past and current decisions (projects, acquisitions, raisings, takeover
@@ -70,8 +81,9 @@ instructions: |
     value-destroying deals, rejected offers followed by a lower price.
   - ⏳ Still in play — current bets: what management is betting on now, the timeline, and
     what success or failure would look like.
-  Then judge whether the CURRENT leadership (note who is in charge now versus who made the
-  past calls) has earned trust to deliver the in-play bets. Aim for 2-4 items per bucket when
+  Include the background-history events above in the buckets (labelled unverified). Then
+  judge whether the CURRENT leadership (note who is in charge now versus who made the past
+  calls) has earned trust to deliver the in-play bets. Aim for 2-4 items per bucket when
   evidence allows; fewer is fine — do not pad.
 
   **Checklist — evaluate every lens and show each in `action_checklist` with ✅/⚠️/❌**
@@ -122,8 +134,9 @@ instructions: |
   - `operation_advice`: use the allowed values with long-term meaning — Buy = accumulate,
     Add = add on weakness, Hold = keep owning, Reduce = trim (overvalued or weakening),
     Sell = exit (thesis broken), Watch = not yet compelling.
-  - `time_sensitivity`: normally "No rush" / "不急"; only use urgent values when news has
+  - `time_sensitivity`: normally the "no rush" value; only use urgent values when news has
     materially changed the thesis.
+  - Write every free-text field in the report language; do not mix languages.
   - `position_advice.no_position` / `has_position`: advice for someone considering a new
     long-term position versus an existing owner.
   - Entry / stop-loss / target style fields (if present): entry = "Accumulate below X

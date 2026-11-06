@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [修复] 组合复盘 LLM 输出被截断：输出上限提高到 8192，按结尾免责声明检测是否完整，不完整时以 16384 重试一次，仍不完整则在邮件中显式提示，并记录 completion_tokens 便于排查
+- [修复] 非中文报告的财务摘要 / 股东回报金额改用币种前缀 + B/M/K（如 `A$15.61B`），时效性与阶段决策枚举值在展示层译为英文；英文报告邮件主题取报告一级标题，未自定义时发件人名改为 `Stock Analysis`（中文报告行为不变）
+- [改进] 长期投资策略强制补充近 5-10 年关键事件（要约收购、破产重整、大额减值、超支、融资、管理层变动）与现任 CEO / 董事长姓名，来自模型背景知识时标注未验证
 - [新功能] 长期投资策略新增 `get_annual_financials`（多年年度三大报表 + 营收 CAGR / 股本稀释 / 净负债）与 `search_company_history`（管理层、资本配置、项目执行、战略的多年回看检索）工具，并输出管理层履历计分卡（已兑现 / 失败 / 进行中），背景知识须标注未验证
 - [新功能] 新增月度组合复盘：配置 `PORTFOLIO_REVIEW_HOLDINGS`（Secrets）后额外推送整组合快照（代码计算权重 / 集中度 / ETF 行业穿透）与 LLM 优劣势、重叠、行业缺口建议；持仓不写日志、不进 Actions artifact
 - [修复] 日股 / 韩股 / 台股 / 澳股（Yahoo 后缀代码）新闻检索误走中文查询词，现按境外标的使用英文查询

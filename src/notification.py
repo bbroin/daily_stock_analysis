@@ -1154,11 +1154,39 @@ class NotificationService(
             or cls._phase_decision_list(phase_decision.get("data_limitations"))
         )
 
+    # Agent / analyzer 的 schema 用中文枚举值（time_sensitivity / phase_decision）；
+    # 非中文报告仅在展示层翻译，不改变存储与校验契约。
+    _CN_ENUM_DISPLAY_EN = {
+        "立即行动": "Act now",
+        "今日内": "Today",
+        "本周内": "This week",
+        "不急": "No rush",
+        "盘前计划": "Pre-market plan",
+        "盘中跟踪": "Intraday tracking",
+        "午间确认": "Midday check",
+        "收盘前风控": "Pre-close risk check",
+        "盘后复盘": "After-market review",
+        "收盘后复盘": "After-close review",
+        "非交易日观察": "Non-trading-day watch",
+        "等待确认": "Wait for confirmation",
+        "观察": "Watch",
+        "止损止盈预警": "Stop / target alert",
+        "禁止追高": "Do not chase",
+        "无盘中动作": "No intraday action",
+    }
+
+    @classmethod
+    def _localize_cn_enum(cls, value: Any, report_language: str) -> Any:
+        if report_language == "zh" or not isinstance(value, str):
+            return value
+        return cls._CN_ENUM_DISPLAY_EN.get(value.strip(), value)
+
     def _append_phase_decision_block(
         self,
         report_lines: List[str],
         dashboard: Dict[str, Any],
         labels: Dict[str, str],
+        report_language: str = "zh",
     ) -> None:
         phase_decision = dashboard.get("phase_decision") if dashboard else None
         if not isinstance(phase_decision, dict):
@@ -1174,8 +1202,8 @@ class NotificationService(
             "",
             f"| {labels['action_window_label']} | {labels['immediate_action_label']} | {labels['next_check_time_label']} |",
             "|---------|---------|---------|",
-            f"| {phase_decision.get('action_window') or 'N/A'} | "
-            f"{phase_decision.get('immediate_action') or 'N/A'} | "
+            f"| {self._localize_cn_enum(phase_decision.get('action_window'), report_language) or 'N/A'} | "
+            f"{self._localize_cn_enum(phase_decision.get('immediate_action'), report_language) or 'N/A'} | "
             f"{phase_decision.get('next_check_time') or 'N/A'} |",
             "",
         ])
@@ -1392,7 +1420,10 @@ class NotificationService(
                 # ========== 核心结论 ==========
                 core = dashboard.get('core_conclusion', {}) if dashboard else {}
                 one_sentence = core.get('one_sentence', result.analysis_summary)
-                time_sense = core.get('time_sensitivity', labels['default_time_sensitivity'])
+                time_sense = self._localize_cn_enum(
+                    core.get('time_sensitivity', labels['default_time_sensitivity']),
+                    report_language,
+                )
                 pos_advice = core.get('position_advice', {})
 
                 report_lines.extend([
@@ -1487,7 +1518,7 @@ class NotificationService(
                                 "",
                             ])
 
-                self._append_phase_decision_block(report_lines, dashboard, labels)
+                self._append_phase_decision_block(report_lines, dashboard, labels, report_language)
 
                 # ========== 作战计划 ==========
                 battle = dashboard.get('battle_plan', {}) if dashboard else {}
@@ -2202,6 +2233,55 @@ class NotificationService(
             return f"{sign}{abs_amount / 1e4:.2f} 万{suffix}"
         return f"{sign}{abs_amount:.0f} {suffix}"
 
+    # 非中文报告使用的币种前缀（英文 / 韩文报告不应出现「亿澳元」等中文单位）
+    _CURRENCY_PREFIX = {
+        "USD": "US$",
+        "HKD": "HK$",
+        "CNY": "CN¥",
+        "RMB": "CN¥",
+        "CNH": "CN¥",
+        "AUD": "A$",
+        "TWD": "NT$",
+        "JPY": "¥",
+        "KRW": "₩",
+    }
+
+    @classmethod
+    def _currency_prefix(cls, currency: Optional[str]) -> str:
+        code = (currency or "").upper()
+        return cls._CURRENCY_PREFIX.get(code, f"{code} " if code else "")
+
+    @classmethod
+    def _format_amount(cls, value: Any, currency: Optional[str] = None, report_language: str = "zh") -> str:
+        """Language-aware amount: zh keeps 亿/万 units; other languages use B/M/K with a currency prefix."""
+        if report_language == "zh":
+            return cls._format_amount_cn(value, currency)
+        try:
+            amount = float(value)
+        except (TypeError, ValueError):
+            return "N/A"
+        if amount != amount:  # NaN
+            return "N/A"
+        sign = "-" if amount < 0 else ""
+        abs_amount = abs(amount)
+        prefix = cls._currency_prefix(currency)
+        for divisor, unit in ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")):
+            if abs_amount >= divisor:
+                return f"{sign}{prefix}{abs_amount / divisor:.2f}{unit}"
+        return f"{sign}{prefix}{abs_amount:.0f}"
+
+    @classmethod
+    def _format_per_share_localized(cls, value: Any, currency: Optional[str] = None, report_language: str = "zh") -> str:
+        if report_language == "zh":
+            return cls._format_per_share(value, currency)
+        try:
+            amount = float(value)
+        except (TypeError, ValueError):
+            return "N/A"
+        if amount != amount:  # NaN
+            return "N/A"
+        return f"{cls._currency_prefix(currency)}{amount:.4f}"
+
     @staticmethod
     def _format_percent(value: Any) -> str:
         try:
@@ -2302,8 +2382,8 @@ class NotificationService(
         report_language = self._get_report_language(result)
         labels = get_report_labels(report_language)
 
-        self._append_financial_summary(lines, blocks, labels)
-        self._append_shareholder_return(lines, blocks, labels)
+        self._append_financial_summary(lines, blocks, labels, report_language)
+        self._append_shareholder_return(lines, blocks, labels, report_language)
         self._append_institutional_flow(lines, blocks, labels)
         self._append_related_boards(lines, blocks, labels)
 
@@ -2312,15 +2392,16 @@ class NotificationService(
         lines: List[str],
         blocks: Dict[str, Any],
         labels: Dict[str, str],
+        report_language: str = "zh",
     ) -> None:
         report = blocks.get("financial_report") or {}
         growth = blocks.get("growth") or {}
         currency = report.get("currency") if isinstance(report.get("currency"), str) else None
         cells = {
             "report_date": self._format_text(report.get("report_date")),
-            "revenue": self._format_amount_cn(report.get("revenue"), currency),
-            "net_profit": self._format_amount_cn(report.get("net_profit_parent"), currency),
-            "operating_cash_flow": self._format_amount_cn(report.get("operating_cash_flow"), currency),
+            "revenue": self._format_amount(report.get("revenue"), currency, report_language),
+            "net_profit": self._format_amount(report.get("net_profit_parent"), currency, report_language),
+            "operating_cash_flow": self._format_amount(report.get("operating_cash_flow"), currency, report_language),
             "roe": self._format_percent(report.get("roe") if report.get("roe") is not None else growth.get("roe")),
             "revenue_yoy": self._format_percent(growth.get("revenue_yoy")),
             "net_profit_yoy": self._format_percent(growth.get("net_profit_yoy")),
@@ -2353,6 +2434,7 @@ class NotificationService(
         lines: List[str],
         blocks: Dict[str, Any],
         labels: Dict[str, str],
+        report_language: str = "zh",
     ) -> None:
         dividend = blocks.get("dividend") or {}
         report = blocks.get("financial_report") or {}
@@ -2369,7 +2451,9 @@ class NotificationService(
 
         ttm_event_count = dividend.get("ttm_event_count")
         cells = {
-            "ttm_cash": self._format_per_share(dividend.get("ttm_cash_dividend_per_share"), dividend_currency),
+            "ttm_cash": self._format_per_share_localized(
+                dividend.get("ttm_cash_dividend_per_share"), dividend_currency, report_language
+            ),
             "ttm_count": str(ttm_event_count) if isinstance(ttm_event_count, int) else "N/A",
             "ttm_yield": self._format_percent(dividend.get("ttm_dividend_yield_pct")),
             "latest_ex": self._format_text(latest_event.get("ex_dividend_date") or latest_event.get("event_date")),

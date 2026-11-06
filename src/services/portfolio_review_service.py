@@ -383,8 +383,12 @@ def _asset_kind(s: HoldingSnapshot) -> str:
     return "Other"
 
 
+_SECTOR_LABELS = {"realestate": "Real Estate"}
+
+
 def _pretty_sector(key: str) -> str:
-    return key.replace("_", " ").strip().title()
+    raw = (key or "").strip()
+    return _SECTOR_LABELS.get(raw.lower(), raw.replace("_", " ").title())
 
 
 # ---------------------------------------------------------------------------
@@ -519,8 +523,41 @@ income vs growth tilt, currency exposure)
 example ASX-listed ETFs or companies, each marked "verify before buying")
 ## What to watch before next month
 
-End with one line: "General information only, not financial advice."
+End with exactly this line, in English and untranslated: "General information only, not financial advice."
 """
+
+
+# The stock analysis path uses 8192; reasoning-capable models may spend part of the
+# budget before writing visible text, so retry once with a larger cap if cut off.
+REVIEW_MAX_TOKENS_ATTEMPTS = (8192, 16384)
+REVIEW_END_MARKER = "not financial advice"
+
+
+def is_review_complete(text: str) -> bool:
+    """The prompt requires the review to end with the disclaimer line."""
+    tail = (text or "").strip()[-300:].lower()
+    return REVIEW_END_MARKER in tail
+
+
+def _generate_review_text(analyzer: Any, prompt: str, max_tokens: int) -> Optional[str]:
+    try:
+        with_metadata = getattr(analyzer, "generate_text_with_metadata", None)
+        if callable(with_metadata):
+            result = with_metadata(prompt, max_tokens=max_tokens, temperature=0.3)
+            text = getattr(result, "text", None) if result is not None else None
+            usage = getattr(result, "usage", None) or {}
+            if isinstance(usage, dict):
+                logger.info(
+                    "[PortfolioReview] LLM usage: completion_tokens=%s, max_tokens=%d, model=%s",
+                    usage.get("completion_tokens"),
+                    max_tokens,
+                    getattr(result, "model", None),
+                )
+            return text or None
+        return analyzer.generate_text(prompt, max_tokens=max_tokens, temperature=0.3)
+    except Exception as exc:
+        logger.error("[PortfolioReview] LLM review failed: %s", type(exc).__name__)
+        return None
 
 
 def run_portfolio_review(
@@ -557,18 +594,25 @@ def run_portfolio_review(
         parts.extend(["", "⚠️ Some PORTFOLIO_REVIEW_HOLDINGS entries were skipped: " + "; ".join(warnings)])
 
     review_text: Optional[str] = None
+    complete = False
     if analyzer is not None and getattr(analyzer, "is_available", lambda: True)():
-        try:
-            review_text = analyzer.generate_text(
-                build_review_prompt(snapshot, results, report_language),
-                max_tokens=4096,
-                temperature=0.3,
-            )
-        except Exception as exc:
-            logger.error("[PortfolioReview] LLM review failed: %s", type(exc).__name__)
-            review_text = None
+        prompt = build_review_prompt(snapshot, results, report_language)
+        for max_tokens in REVIEW_MAX_TOKENS_ATTEMPTS:
+            text = _generate_review_text(analyzer, prompt, max_tokens)
+            if text:
+                review_text = text
+                complete = is_review_complete(text)
+                if complete:
+                    break
+                logger.warning(
+                    "[PortfolioReview] LLM review looks truncated (max_tokens=%d, %d chars); retrying",
+                    max_tokens,
+                    len(text),
+                )
     if review_text:
         parts.extend(["", str(review_text).strip()])
+        if not complete:
+            parts.extend(["", "_⚠️ The AI review was cut off before it finished; sections may be missing._"])
     else:
         parts.extend(["", "_The AI review could not be generated this run; the snapshot above is still current._"])
     return "\n".join(parts)
