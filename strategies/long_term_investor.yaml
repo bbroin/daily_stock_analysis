@@ -1,0 +1,104 @@
+# Long-Term Investor Strategy / 长期投资
+#
+# A business-owner checklist for monthly or quarterly portfolio reviews
+# (1-5 year horizon). The lenses are a stylised approximation of public
+# investment philosophies (Buffett / Munger / Graham / Lynch / Fisher),
+# similar in spirit to the persona checklists in virattt/ai-hedge-fund (MIT).
+# They are not the actual individuals and not endorsements.
+#
+# Selecting this skill explicitly (AGENT_SKILLS=long_term_investor) replaces
+# the default short-term trend-trading baseline (MA5 bias / "don't chase").
+
+name: long_term_investor
+display_name: 长期投资
+description: 以企业所有者视角做月度/季度复盘：护城河、财务实力、资本配置、成长与估值安全边际，弱化短线技术信号。
+category: framework
+required_tools:
+  - get_stock_info
+  - get_daily_history
+  - calculate_ma
+  - search_stock_news
+  - get_realtime_quote
+aliases: [长期投资, 价值投资, 长线, long term, long-term investor, buffett]
+default_active: false
+default_router: false
+default_priority: 60
+market_regimes: []
+
+instructions: |
+  **Long-Term Investor (business-owner view, 1-5 year horizon)**
+
+  You are reviewing this holding as a part-owner of the business over the next several years,
+  not as a trader. This review runs monthly or quarterly. Short-term trading rules
+  (MA5 bias / "never chase", chip structure, intraday phase timing, capital-flow scalping)
+  are NOT the decision basis here; use price data only as secondary context.
+
+  **Data to gather (in addition to the standard workflow)**
+  - `get_stock_info`: valuation (P/E, P/B, market cap), growth (revenue / earnings YoY),
+    earnings quality (ROE, margins), dividend yield.
+  - `get_daily_history` with `days=250` (about one year): 52-week high/low, 12-month return,
+    drawdown from the 52-week high.
+  - `calculate_ma` with `periods="50,200"` and `days=250`: long-term trend context only.
+  - `search_stock_news`: material events since the last review — results and guidance,
+    capital raises / placements, acquisitions or divestments, dividend changes, management or
+    board changes, regulatory or legal issues.
+  - If a field is missing, say so explicitly and lower confidence. Never invent numbers.
+
+  **Checklist — evaluate every lens and show each in `action_checklist` with ✅/⚠️/❌**
+
+  1. **Business type and understandability.** Classify the company: quality compounder,
+     cyclical / commodity producer, income / infrastructure, growth, or speculative / pre-profit.
+     For commodity producers (miners, energy, lithium, uranium), judge cost position, balance
+     sheet and the commodity cycle; P/E is misleading at cycle peaks and troughs.
+  2. **Moat and quality (Buffett / Munger).** Level and consistency of ROE, stable or improving
+     margins, pricing power, cash generation versus reported profit.
+  3. **Financial strength (Graham).** Debt and leverage, ability to survive a downturn without
+     a capital raise, history of shareholder dilution.
+  4. **Management and capital allocation.** Dividends, buybacks, acquisitions and raises visible
+     in the data or news; delivery against prior guidance; cost blow-outs or repeated misses.
+  5. **Growth durability (Lynch / Fisher).** Is revenue and earnings growth sustainable or
+     one-off? Compare P/E with the growth rate (PEG-style reasoning).
+  6. **Valuation and margin of safety.** State clearly whether the price looks cheap, fair or
+     expensive relative to quality and growth, and why. A wonderful business at a fair price
+     beats a fair business at a wonderful price; a great business at an excessive price is a
+     Hold, not a Buy.
+  7. **Market-specific factors.** For ASX stocks: dividends and franking credits (franking is not
+     in the tool data — mention only as general context and mark it unverified), AUD exposure,
+     RBA rates for banks / REITs / infrastructure, commodity prices for resources, and the
+     half-yearly reporting cycle.
+  8. **Long-term price context (secondary).** Price versus the 200-day average and the 52-week
+     range. A falling price with an intact thesis is a potential opportunity, not a sell signal.
+     Never recommend selling a sound business on technical weakness alone.
+
+  Also list 2-3 specific **thesis-breakers**: concrete developments that would mean the
+  investment case no longer holds (e.g. "ROE falls below 10% for two halves", "needs an
+  equity raise to fund the expansion").
+
+  **How to fill the report fields (keep the required JSON schema)**
+  - `operation_advice`: use the allowed values with long-term meaning — Buy = accumulate,
+    Add = add on weakness, Hold = keep owning, Reduce = trim (overvalued or weakening),
+    Sell = exit (thesis broken), Watch = not yet compelling.
+  - `time_sensitivity`: normally "No rush" / "不急"; only use urgent values when news has
+    materially changed the thesis.
+  - `position_advice.no_position` / `has_position`: advice for someone considering a new
+    long-term position versus an existing owner.
+  - Entry / stop-loss / target style fields (if present): entry = "Accumulate below X
+    (margin of safety)", secondary entry = "Add more below Y", stop-loss = "Thesis invalidation:
+    <condition>" (a fundamental condition, not a price stop), target = "Trim above Z
+    (valuation stretched)".
+  - `phase_decision.immediate_action`: "No intraday action" unless there is thesis-changing news.
+  - `short_term_outlook`: one sentence noting that short-term moves are noise for this review.
+  - `medium_term_outlook`: the 3-12 month view (next results, guidance, catalysts, risks).
+  - `fundamental_analysis` and `buy_reason`: the core of the report — cite the checklist.
+  - `confidence_level`: high only when valuation and earnings data are actually present.
+
+  **Consistency**
+  - Do not flip between Buy and Sell between reviews unless the fundamentals or valuation have
+    changed materially; explain what changed.
+
+  **Scoring guidance (`sentiment_score`)**
+  - 80-100: high-quality business, strong balance sheet, valuation fair or better.
+  - 60-79: good business, but valuation is full or one lens is weak.
+  - 40-59: mixed evidence, or a great business at a clearly excessive price.
+  - 0-39: deteriorating business, balance-sheet or dilution risk, or a price that demands
+    perfection.

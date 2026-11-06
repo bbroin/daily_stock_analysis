@@ -1431,6 +1431,24 @@ PUSHOVER_API_TOKEN=your_api_token
 
 ## 高级功能
 
+### 长期投资（月度复盘）模式
+
+默认分析采用短线趋势交易基线（MA5 乖离率不追高、MA5>MA10>MA20 多头排列、回踩 MA5 买点）。如需以企业所有者视角做月度/季度长期复盘，可显式选择内置策略 `long_term_investor`：
+
+```bash
+AGENT_SKILLS=long_term_investor
+NEWS_STRATEGY_PROFILE=long
+NEWS_MAX_AGE_DAYS=30
+TRADING_DAY_CHECK_ENABLED=false   # 月度定时日可能落在周末/假日
+```
+
+- 显式选择该策略后，默认 `bull_trend` 短线基线不再注入 prompt；配置非 `all` 的 `AGENT_SKILLS` 会自动走 Agent 分析分支（更慢、token 更多，月度运行成本可控）。
+- Agent 分支会预取约 240 个交易日历史，策略要求通过 `get_stock_info`（估值/成长/盈利/股息率）、`get_daily_history(days=250)`、`calculate_ma(periods="50,200")` 与 `search_stock_news` 取数。
+- 检查清单：业务类型、护城河与质量、财务实力、管理层资本配置、成长持续性、估值安全边际、市场特定因素（ASX：股息与 franking、AUD、RBA、大宗商品）、长期价格位置（仅作辅助）。
+- 报告 JSON 结构不变，仅改变字段含义：止损位改为“投资逻辑失效条件”，买点改为“安全边际下的增持区间”，操作建议按长期持有语义解读。
+- 限制：报告模板中的短期展望、狙击点位等字段仍会出现；数据质量取决于 YFinance，franking 信息不在工具数据中。
+- 仓库自带的 `00-daily-analysis.yml` 已透传 `AGENT_SKILLS` / `NEWS_STRATEGY_PROFILE` / `NEWS_MAX_AGE_DAYS`，可直接在 Actions Variables 配置。
+
 ### 港股支持
 
 使用 `hk` 前缀指定港股代码：

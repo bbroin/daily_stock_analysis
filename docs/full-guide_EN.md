@@ -1285,6 +1285,24 @@ System defaults to AkShare (free), also supports other data sources:
 
 ## Advanced Features
 
+### Long-term investor (monthly review) mode
+
+The default analysis uses a short-term trend-trading baseline (no chasing above MA5 bias, MA5>MA10>MA20 alignment, MA5 pullback entries). For a business-owner style monthly or quarterly review, explicitly select the built-in `long_term_investor` strategy:
+
+```bash
+AGENT_SKILLS=long_term_investor
+NEWS_STRATEGY_PROFILE=long
+NEWS_MAX_AGE_DAYS=30
+TRADING_DAY_CHECK_ENABLED=false   # a monthly run date can fall on a weekend/holiday
+```
+
+- Selecting it explicitly removes the default `bull_trend` short-term baseline from the prompt. A non-`all` `AGENT_SKILLS` automatically uses the Agent analysis path (slower and more tokens; affordable at a monthly cadence).
+- The Agent path prefetches about 240 trading days of history; the strategy asks the model to use `get_stock_info` (valuation / growth / earnings / dividend yield), `get_daily_history(days=250)`, `calculate_ma(periods="50,200")` and `search_stock_news`.
+- Checklist: business type, moat and quality, financial strength, capital allocation, growth durability, valuation and margin of safety, market-specific factors (ASX: dividends and franking, AUD, RBA, commodities), and long-term price context (secondary only).
+- The report JSON schema is unchanged; only field meanings change: stop-loss becomes a thesis-invalidation condition, entry becomes an accumulate-below range, and actions read as long-term ownership decisions.
+- Limits: short-term outlook and entry/stop fields still appear in the template; data quality depends on YFinance, and franking data is not available from the tools.
+- The bundled `00-daily-analysis.yml` passes `AGENT_SKILLS` / `NEWS_STRATEGY_PROFILE` / `NEWS_MAX_AGE_DAYS` through, so they can be set as Actions Variables.
+
 ### Hong Kong Stock Support
 
 Use `hk` prefix for HK stock codes:
