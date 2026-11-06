@@ -438,6 +438,9 @@ jobs:
           AGENT_SKILLS: ${{ vars.AGENT_SKILLS || secrets.AGENT_SKILLS || '' }}
           NEWS_STRATEGY_PROFILE: ${{ vars.NEWS_STRATEGY_PROFILE || secrets.NEWS_STRATEGY_PROFILE || 'short' }}
           NEWS_MAX_AGE_DAYS: ${{ vars.NEWS_MAX_AGE_DAYS || secrets.NEWS_MAX_AGE_DAYS || '3' }}
+          # 月度组合复盘：持仓只从 Secrets 读取（公开仓库的 Variables 可能出现在日志中）；留空则不启用
+          PORTFOLIO_REVIEW_HOLDINGS: ${{ secrets.PORTFOLIO_REVIEW_HOLDINGS }}
+          PORTFOLIO_REVIEW_CURRENCY: ${{ vars.PORTFOLIO_REVIEW_CURRENCY || secrets.PORTFOLIO_REVIEW_CURRENCY || 'AUD' }}
           REPORT_SHOW_LLM_MODEL: ${{ vars.REPORT_SHOW_LLM_MODEL || secrets.REPORT_SHOW_LLM_MODEL || 'true' }}
           SINGLE_STOCK_NOTIFY: ${{ vars.SINGLE_STOCK_NOTIFY || secrets.SINGLE_STOCK_NOTIFY || 'false' }}
           MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}

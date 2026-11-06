@@ -1443,11 +1443,29 @@ TRADING_DAY_CHECK_ENABLED=false   # 月度定时日可能落在周末/假日
 ```
 
 - 显式选择该策略后，默认 `bull_trend` 短线基线不再注入 prompt；配置非 `all` 的 `AGENT_SKILLS` 会自动走 Agent 分析分支（更慢、token 更多，月度运行成本可控）。
-- Agent 分支会预取约 240 个交易日历史，策略要求通过 `get_stock_info`（估值/成长/盈利/股息率）、`get_daily_history(days=250)`、`calculate_ma(periods="50,200")` 与 `search_stock_news` 取数。
+- Agent 分支会预取约 240 个交易日历史，策略要求通过 `get_stock_info`（估值/成长/盈利/股息率）、`get_annual_financials`（约 4 个财年的年度利润表/资产负债表/现金流，含营收 CAGR、股本变化即稀释、净负债）、`search_company_history`（管理层变动、收购/要约/融资、项目延期/超支/减值、当前战略，不受新闻时效窗口限制）、`get_daily_history(days=250)`、`calculate_ma(periods="50,200")` 与 `search_stock_news` 取数。
 - 检查清单：业务类型、护城河与质量、财务实力、管理层资本配置、成长持续性、估值安全边际、市场特定因素（ASX：股息与 franking、AUD、RBA、大宗商品）、长期价格位置（仅作辅助）。
+- 管理层履历计分卡：把过往与当前的重大决策分为 ✅ 已兑现 / ❌ 失败或损害股东 / ⏳ 仍在进行，并判断现任管理层是否值得信任；写入推送报告中可见的 `positive_catalysts` / `risk_alerts` / `sentiment_summary` / `earnings_outlook` / `action_checklist`。
+- 证据标注：工具结果中的事实可直接引用；工具未覆盖的较早历史可来自模型背景知识，但必须标注“(background, unverified)”。
 - 报告 JSON 结构不变，仅改变字段含义：止损位改为“投资逻辑失效条件”，买点改为“安全边际下的增持区间”，操作建议按长期持有语义解读。
-- 限制：报告模板中的短期展望、狙击点位等字段仍会出现；数据质量取决于 YFinance，franking 信息不在工具数据中。
+- 限制：报告模板中的短期展望、狙击点位等字段仍会出现；数据质量取决于 YFinance（ASX 半年报在 Yahoo 上覆盖较稀疏），franking 信息不在工具数据中；多数搜索引擎的时间参数最长只到近一年（Tavily 通用检索不限时间），`search_company_history` 需要配置搜索 API Key；不读取交易所公告原文或年报 PDF。
 - 仓库自带的 `00-daily-analysis.yml` 已透传 `AGENT_SKILLS` / `NEWS_STRATEGY_PROFILE` / `NEWS_MAX_AGE_DAYS`，可直接在 Actions Variables 配置。
+
+### 月度组合复盘（整组合视角）
+
+配置 `PORTFOLIO_REVIEW_HOLDINGS` 后，每次运行结束会额外推送一条「组合复盘」消息：按最新价计算各持仓市值与权重、集中度（最大持仓 / 前三持仓 / 有效持仓数）、行业暴露（Yahoo 提供 ETF 行业权重时做穿透），再由 LLM 输出优势、劣势与风险（集中度、本土偏好、行业缺口、单一股票风险、收益/成长倾向、汇率）、重叠检查、优先加仓顺序（参考本次个股复盘结论）以及长期成长可考虑补充的行业/主题。
+
+```bash
+# CODE:份数（按最新价估值）或 CODE:$金额（Yahoo 无法取价的基金等）
+PORTFOLIO_REVIEW_HOLDINGS=VAS.AX:120,VGS.AX:80,PDN.AX:300,Vanguard Diversified Growth:$5000
+PORTFOLIO_REVIEW_CURRENCY=AUD   # 计价货币，默认 AUD；非该币种持仓按 Yahoo 汇率换算
+```
+
+- 用逗号 / 分号 / 换行分隔，数字不要带千分位逗号；同一代码重复出现会合并。
+- 快照表中的市值与权重由代码计算，LLM 只负责定性点评，不会改写数字；无法取价的持仓会单独列出并排除在权重之外。
+- 隐私：持仓不写入日志；GitHub Actions 中只从 **Secrets** 读取（`00-daily-analysis.yml` 不读 Variables，公开仓库的运行日志对所有人可见），且在 Actions 中不会写入会被上传为 artifact 的 `reports/` 目录。本地运行且未启用推送（`--no-notify` 或无可用渠道）时保存为 `reports/portfolio_review_YYYYMMDD.md`。
+- 买卖后更新 Secret 即可；份数随定投小幅变化时无需每月更新。
+- 复盘失败不影响个股分析与推送。
 
 ### 港股支持
 

@@ -27,7 +27,8 @@ def test_skill_file_loads_and_is_opt_in():
     assert skill.category == "framework"
     assert skill.default_active is False
     assert skill.default_router is False
-    for tool in ("get_stock_info", "get_daily_history", "calculate_ma", "search_stock_news"):
+    for tool in ("get_stock_info", "get_annual_financials", "search_company_history",
+                 "get_daily_history", "calculate_ma", "search_stock_news"):
         assert tool in skill.required_tools
     assert skill.allowed_tools == []  # must not restrict the agent's tool surface
 
@@ -47,6 +48,8 @@ def test_explicit_selection_replaces_short_term_baseline():
     assert "Moat and quality" in state.skill_instructions
     assert "Thesis invalidation" in state.skill_instructions
     assert "MA5 > MA10" not in state.skill_instructions
+    assert "Leadership track record scorecard" in state.skill_instructions
+    assert "(background, unverified)" in state.skill_instructions
 
 
 def test_localized_label():
@@ -65,3 +68,12 @@ def test_workflow_passes_strategy_and_news_settings():
     assert env["AGENT_SKILLS"].endswith("|| '' }}")
     assert env["NEWS_STRATEGY_PROFILE"].endswith("|| 'short' }}")
     assert env["NEWS_MAX_AGE_DAYS"].endswith("|| '3' }}")
+
+
+def test_workflow_reads_portfolio_holdings_from_secrets_only():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["analyze"]["steps"]
+    env = next(step for step in steps if step.get("name") == "执行股票分析")["env"]
+    # Holdings must never fall back to repository Variables (visible in public-repo logs).
+    assert env["PORTFOLIO_REVIEW_HOLDINGS"] == "${{ secrets.PORTFOLIO_REVIEW_HOLDINGS }}"
+    assert env["PORTFOLIO_REVIEW_CURRENCY"].endswith("|| 'AUD' }}")

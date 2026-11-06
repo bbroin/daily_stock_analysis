@@ -745,3 +745,61 @@ get_capital_flow_tool = ToolDefinition(
 
 
 ALL_DATA_TOOLS.append(get_capital_flow_tool)
+
+
+# ============================================================
+# get_annual_financials
+# ============================================================
+
+def _handle_get_annual_financials(stock_code: str, years: int = 4) -> dict:
+    """Get multi-year annual income statement, balance sheet and cash flow."""
+    from data_provider.yfinance_fundamental_adapter import get_annual_statements
+
+    try:
+        years_int = int(years)
+    except (TypeError, ValueError):
+        years_int = 4
+    years_int = max(1, min(years_int, 10))
+
+    try:
+        payload = get_annual_statements(stock_code, max_years=years_int)
+    except Exception as e:
+        logger.warning("get_annual_financials failed for %s: %s", stock_code, e)
+        return {"code": stock_code.upper(), "status": "failed", "error": str(e)}
+
+    payload["code"] = stock_code.upper()
+    if payload.get("status") != "ok":
+        payload["note"] = (
+            "Annual statements unavailable from Yahoo Finance for this symbol. "
+            "Do not invent figures; say the multi-year history could not be verified."
+        )
+    return payload
+
+
+get_annual_financials_tool = ToolDefinition(
+    name="get_annual_financials",
+    description="Get multi-year ANNUAL financial statements (usually ~4 fiscal years, newest first): "
+                "revenue, profit, EPS, assets, debt, cash, equity, share count, operating cash flow, "
+                "capex, free cash flow, share issuance and dividends, plus derived revenue CAGR, "
+                "share-count change (dilution) and net debt. Source: Yahoo Finance. Use for "
+                "long-term business-quality and capital-allocation review.",
+    parameters=[
+        ToolParameter(
+            name="stock_code",
+            type="string",
+            description="Stock code, e.g., 'PDN.AX', 'AAPL', 'hk00700'",
+        ),
+        ToolParameter(
+            name="years",
+            type="integer",
+            description="Number of fiscal years to return (default: 4, max: 10; Yahoo usually has 4)",
+            required=False,
+            default=4,
+        ),
+    ],
+    handler=_handle_get_annual_financials,
+    category="data",
+    policy=_MARKET_DATA_STOCK_POLICY,
+)
+
+ALL_DATA_TOOLS.append(get_annual_financials_tool)

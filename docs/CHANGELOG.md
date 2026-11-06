@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
-
+- [新功能] 长期投资策略新增 `get_annual_financials`（多年年度三大报表 + 营收 CAGR / 股本稀释 / 净负债）与 `search_company_history`（管理层、资本配置、项目执行、战略的多年回看检索）工具，并输出管理层履历计分卡（已兑现 / 失败 / 进行中），背景知识须标注未验证
+- [新功能] 新增月度组合复盘：配置 `PORTFOLIO_REVIEW_HOLDINGS`（Secrets）后额外推送整组合快照（代码计算权重 / 集中度 / ETF 行业穿透）与 LLM 优劣势、重叠、行业缺口建议；持仓不写日志、不进 Actions artifact
+- [修复] 日股 / 韩股 / 台股 / 澳股（Yahoo 后缀代码）新闻检索误走中文查询词，现按境外标的使用英文查询
 - [新功能] 新增内置策略 `long_term_investor`（长期投资 / 月度复盘）：企业所有者视角检查清单（护城河、财务实力、资本配置、成长、估值安全边际、ASX 股息与 franking），显式选择后替代默认短线基线；`00-daily-analysis.yml` 透传 `AGENT_SKILLS` / `NEWS_STRATEGY_PROFILE` / `NEWS_MAX_AGE_DAYS`，报告产物保留期延长至 90 天；本 fork 的定时任务改为每月 1 日 UTC 06:30（ASX 收盘后）
 - [新功能] 支持澳大利亚 ASX 个股（Yahoo Finance `.AX` 后缀，如 `BHP.AX`、`4DX.AX`），新增 `au` 市场标签：市场识别、YFinance 数据路由与 ASX 指数、XASX 交易日历（Australia/Sydney）、AUD 币种标注与澳股 prompt 语境；大盘复盘与 Market Light 暂不含 `au`
 - [修复] 依赖锁定 `akshare<1.20.0`，避免上游目录与 HTTP 层重构导致 CI 与桌面打包失败；Python 3.10 新装限制 `litellm<1.98.0`，修复 `NotRequired` 导入错误

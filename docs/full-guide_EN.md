@@ -1297,11 +1297,29 @@ TRADING_DAY_CHECK_ENABLED=false   # a monthly run date can fall on a weekend/hol
 ```
 
 - Selecting it explicitly removes the default `bull_trend` short-term baseline from the prompt. A non-`all` `AGENT_SKILLS` automatically uses the Agent analysis path (slower and more tokens; affordable at a monthly cadence).
-- The Agent path prefetches about 240 trading days of history; the strategy asks the model to use `get_stock_info` (valuation / growth / earnings / dividend yield), `get_daily_history(days=250)`, `calculate_ma(periods="50,200")` and `search_stock_news`.
+- The Agent path prefetches about 240 trading days of history; the strategy asks the model to use `get_stock_info` (valuation / growth / earnings / dividend yield), `get_annual_financials` (about 4 fiscal years of annual income statement, balance sheet and cash flow, with revenue CAGR, share-count change (dilution) and net debt), `search_company_history` (leadership changes, acquisitions / takeover offers / capital raisings, project delays / cost overruns / impairments, current strategy; not limited by the news freshness window), `get_daily_history(days=250)`, `calculate_ma(periods="50,200")` and `search_stock_news`.
 - Checklist: business type, moat and quality, financial strength, capital allocation, growth durability, valuation and margin of safety, market-specific factors (ASX: dividends and franking, AUD, RBA, commodities), and long-term price context (secondary only).
+- Leadership track-record scorecard: past and current decisions are sorted into ✅ paid off / ❌ failed or cost shareholders / ⏳ still in play, with a judgement on whether current leadership has earned trust. Results go into the fields shown in the pushed report: `positive_catalysts`, `risk_alerts`, `sentiment_summary`, `earnings_outlook` and `action_checklist`.
+- Evidence labelling: facts from tool results may be cited directly; older history not covered by the tools may come from the model's background knowledge but must be marked "(background, unverified)".
 - The report JSON schema is unchanged; only field meanings change: stop-loss becomes a thesis-invalidation condition, entry becomes an accumulate-below range, and actions read as long-term ownership decisions.
-- Limits: short-term outlook and entry/stop fields still appear in the template; data quality depends on YFinance, and franking data is not available from the tools.
+- Limits: short-term outlook and entry/stop fields still appear in the template; data quality depends on YFinance (ASX half-yearly data is sparse on Yahoo), and franking data is not available from the tools; most search providers only reach back about one year (Tavily general search has no date limit) and `search_company_history` needs a search API key; exchange announcements and annual-report PDFs are not read.
 - The bundled `00-daily-analysis.yml` passes `AGENT_SKILLS` / `NEWS_STRATEGY_PROFILE` / `NEWS_MAX_AGE_DAYS` through, so they can be set as Actions Variables.
+
+### Monthly portfolio review (whole-portfolio view)
+
+When `PORTFOLIO_REVIEW_HOLDINGS` is set, every run ends with an extra "Portfolio review" message: market value and weight per holding from the latest prices, concentration (largest holding / top 3 / effective number of positions), sector exposure (with ETF look-through when Yahoo provides sector weightings), then an LLM review of strengths, weaknesses and risks (concentration, home bias, sector gaps, single-stock risk, income vs growth tilt, currency), an overlap check, which existing holdings to add to first (using this run's stock reviews), and sectors / themes to consider for long-term growth.
+
+```bash
+# CODE:units (priced at the latest price) or CODE:$value (funds Yahoo cannot price)
+PORTFOLIO_REVIEW_HOLDINGS=VAS.AX:120,VGS.AX:80,PDN.AX:300,Vanguard Diversified Growth:$5000
+PORTFOLIO_REVIEW_CURRENCY=AUD   # base currency, default AUD; other currencies are converted with Yahoo FX
+```
+
+- Separate entries with commas, semicolons or new lines; do not use thousands separators in numbers. Repeated codes are merged.
+- Values and weights in the snapshot table are computed by code; the LLM only writes the qualitative review and cannot change the numbers. Holdings that cannot be priced are listed and excluded from weights.
+- Privacy: holdings are never logged. On GitHub Actions they are read only from **Secrets** (`00-daily-analysis.yml` does not read Variables for this; public-repo run logs are visible to everyone), and the review is never written to the `reports/` directory that is uploaded as an artifact. Locally, with notifications disabled (`--no-notify` or no channel available), it is saved as `reports/portfolio_review_YYYYMMDD.md`.
+- Update the Secret after you buy or sell; small regular top-ups do not need a monthly update.
+- A failed review does not affect stock analysis or notifications.
 
 ### Hong Kong Stock Support
 

@@ -15,6 +15,8 @@ description: 以企业所有者视角做月度/季度复盘：护城河、财务
 category: framework
 required_tools:
   - get_stock_info
+  - get_annual_financials
+  - search_company_history
   - get_daily_history
   - calculate_ma
   - search_stock_news
@@ -36,6 +38,13 @@ instructions: |
   **Data to gather (in addition to the standard workflow)**
   - `get_stock_info`: valuation (P/E, P/B, market cap), growth (revenue / earnings YoY),
     earnings quality (ROE, margins), dividend yield.
+  - `get_annual_financials` (default 4 fiscal years): multi-year revenue, profit, cash flow,
+    capex, debt, cash, share count, share issuance and dividends. Use `derived` for revenue
+    CAGR, share-count change (dilution) and net debt. If `status` is not "ok", say the
+    multi-year history could not be verified.
+  - `search_company_history`: leadership / board changes, acquisitions, takeover offers,
+    capital raisings, project delays, cost overruns, impairments and current strategy. Most
+    search providers only reach back about a year.
   - `get_daily_history` with `days=250` (about one year): 52-week high/low, 12-month return,
     drawdown from the 52-week high.
   - `calculate_ma` with `periods="50,200"` and `days=250`: long-term trend context only.
@@ -43,6 +52,27 @@ instructions: |
     capital raises / placements, acquisitions or divestments, dividend changes, management or
     board changes, regulatory or legal issues.
   - If a field is missing, say so explicitly and lower confidence. Never invent numbers.
+  - These calls are independent: request them together in the same step to stay within the
+    step budget.
+
+  **Evidence labelling (mandatory)**
+  - Facts from tool results may be stated directly; cite the period or the source name.
+  - Older history that is not in the tool results may come from your background knowledge,
+    but every such statement MUST end with "(background, unverified)". Never present a
+    remembered figure, date or name as verified, and never invent one.
+
+  **Leadership track record scorecard**
+  Using `search_company_history`, `get_annual_financials` and the news, classify the
+  company's major past and current decisions (projects, acquisitions, raisings, takeover
+  responses, strategic pivots, guidance) into:
+  - ✅ Paid off — delivered as promised or created value (e.g. on-time ramp-up, accretive deal).
+  - ❌ Failed / cost shareholders — write-downs, blow-outs, missed guidance, heavy dilution,
+    value-destroying deals, rejected offers followed by a lower price.
+  - ⏳ Still in play — current bets: what management is betting on now, the timeline, and
+    what success or failure would look like.
+  Then judge whether the CURRENT leadership (note who is in charge now versus who made the
+  past calls) has earned trust to deliver the in-play bets. Aim for 2-4 items per bucket when
+  evidence allows; fewer is fine — do not pad.
 
   **Checklist — evaluate every lens and show each in `action_checklist` with ✅/⚠️/❌**
 
@@ -54,8 +84,10 @@ instructions: |
      margins, pricing power, cash generation versus reported profit.
   3. **Financial strength (Graham).** Debt and leverage, ability to survive a downturn without
      a capital raise, history of shareholder dilution.
-  4. **Management and capital allocation.** Dividends, buybacks, acquisitions and raises visible
-     in the data or news; delivery against prior guidance; cost blow-outs or repeated misses.
+  4. **Management and capital allocation.** Summarise the track record scorecard: dividends,
+     buybacks, acquisitions and raises (share-count change from `get_annual_financials`),
+     delivery against prior guidance, cost blow-outs or repeated misses, and whether current
+     leadership has earned trust for the bets now in play.
   5. **Growth durability (Lynch / Fisher).** Is revenue and earnings growth sustainable or
      one-off? Compare P/E with the growth rate (PEG-style reasoning).
   6. **Valuation and margin of safety.** State clearly whether the price looks cheap, fair or
@@ -75,6 +107,18 @@ instructions: |
   equity raise to fund the expansion").
 
   **How to fill the report fields (keep the required JSON schema)**
+  The emailed dashboard shows `dashboard.core_conclusion`, `dashboard.intelligence`,
+  `dashboard.battle_plan` and the financial-summary blocks. Put the long-term findings there:
+  - `dashboard.core_conclusion.one_sentence`: the long-term verdict in one sentence.
+  - `dashboard.intelligence.earnings_outlook`: the multi-year financial trend (revenue CAGR,
+    profitability, cash flow vs profit, net debt, dilution) and the next 3-12 months.
+  - `dashboard.intelligence.positive_catalysts`: the scorecard's "✅ Paid off" items, then the
+    "⏳ In play" items (prefix each with the emoji).
+  - `dashboard.intelligence.risk_alerts`: the scorecard's "❌ Failed" items, then the
+    thesis-breakers (prefix with "Thesis-breaker:").
+  - `dashboard.intelligence.sentiment_summary`: one or two sentences on leadership — who runs
+    the company now and whether they have earned trust for the current bets.
+  - `dashboard.battle_plan.action_checklist`: one line per checklist lens with ✅/⚠️/❌.
   - `operation_advice`: use the allowed values with long-term meaning — Buy = accumulate,
     Add = add on weakness, Hold = keep owning, Reduce = trim (overvalued or weakening),
     Sell = exit (thesis broken), Watch = not yet compelling.
@@ -89,8 +133,10 @@ instructions: |
   - `phase_decision.immediate_action`: "No intraday action" unless there is thesis-changing news.
   - `short_term_outlook`: one sentence noting that short-term moves are noise for this review.
   - `medium_term_outlook`: the 3-12 month view (next results, guidance, catalysts, risks).
-  - `fundamental_analysis` and `buy_reason`: the core of the report — cite the checklist.
-  - `confidence_level`: high only when valuation and earnings data are actually present.
+  - `fundamental_analysis`, `buy_reason`, `risk_warning`: also fill these with the checklist
+    reasoning (they appear in the web UI and history views).
+  - `confidence_level`: high only when valuation, annual statements and history evidence are
+    actually present.
 
   **Consistency**
   - Do not flip between Buy and Sell between reviews unless the fundamentals or valuation have
