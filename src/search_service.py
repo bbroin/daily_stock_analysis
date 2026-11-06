@@ -43,6 +43,7 @@ from src.data.stock_mapping import (
     canonicalize_foreign_stock_code,
     foreign_stock_english_aliases,
 )
+from src.services.market_symbol_utils import get_suffix_market
 from src.services.run_diagnostics import record_provider_run, record_provider_run_started
 
 logger = logging.getLogger(__name__)
@@ -2534,6 +2535,10 @@ class SearchService:
         PR #2047 (so alias resolution and foreign-ness detection no longer
         disagree on the same input).
         """
+        # Yahoo 后缀市场（.T / .KS / .KQ / .TW / .TWO / .AX）同样属于境外标的，
+        # 需走英文检索路径，否则会拼出中文查询词而漏掉英文新闻。
+        if get_suffix_market(stock_code):
+            return True
         code = canonicalize_foreign_stock_code(stock_code).strip()
         if not code:
             return False
@@ -4635,6 +4640,91 @@ class SearchService:
         
         return results
     
+    # 公司历史/管理层履历检索：用于长期投资视角，回看窗口远长于新闻时效窗口。
+    # 多数搜索引擎的时间参数最长只到「近一年」，Tavily 通用检索不限时间。
+    COMPANY_HISTORY_LOOKBACK_DAYS = 1825
+
+    def search_company_history(
+        self,
+        stock_code: str,
+        stock_name: str,
+        max_searches: int = 4,
+    ) -> Dict[str, SearchResponse]:
+        """
+        公司历史与管理层履历检索（长期投资视角）
+
+        检索维度：
+        1. leadership - 管理层/董事会变动与任职经历
+        2. capital_allocation - 收购、要约、融资、增发稀释
+        3. execution - 项目延期、超支、减值、业绩指引兑现
+        4. strategy - 当前战略与在建/规划项目
+
+        与 search_comprehensive_intel 不同，这里不套用 NEWS_MAX_AGE_DAYS 时效过滤，
+        因为目的是回看多年的决策记录，而不是追踪最新消息。指数/ETF 不适用，返回空字典。
+
+        Returns:
+            {维度名称: SearchResponse} 字典
+        """
+        if self.is_index_or_etf(stock_code, stock_name):
+            return {}
+
+        if self._is_foreign_stock(stock_code):
+            english_aliases = self._foreign_english_query_terms(stock_code, stock_name)
+            name = english_aliases[0] if english_aliases else stock_name
+            search_dimensions = [
+                ('leadership', f"{name} CEO managing director chairman board appointment resignation track record"),
+                ('capital_allocation', f"{name} acquisition takeover offer capital raising placement share issue"),
+                ('execution', f"{name} project delay cost overrun impairment write-down guidance"),
+                ('strategy', f"{name} strategy growth plan new project expansion investment"),
+            ]
+        else:
+            name = stock_name
+            search_dimensions = [
+                ('leadership', f"{name} 董事长 总经理 管理层 变动 任职经历"),
+                ('capital_allocation', f"{name} 收购 并购 定增 募资 增发"),
+                ('execution', f"{name} 项目 延期 超支 商誉减值 业绩 不及预期"),
+                ('strategy', f"{name} 发展战略 新项目 扩产 投资计划"),
+            ]
+
+        target_per_dimension = 3
+        provider_max_results = self._provider_request_size(target_per_dimension)
+        prefer_chinese = self._should_prefer_chinese_news(stock_code, stock_name)
+        results: Dict[str, SearchResponse] = {}
+        provider_index = 0
+
+        for dim_name, query in search_dimensions[:max(0, int(max_searches))]:
+            available_providers = [p for p in self._providers if p.is_available]
+            if not available_providers:
+                break
+            provider = available_providers[provider_index % len(available_providers)]
+            provider_index += 1
+
+            logger.info("[公司历史检索] %s: 使用 %s, query=%s", dim_name, provider.name, query)
+            response = provider.search(
+                query,
+                max_results=provider_max_results,
+                days=self.COMPANY_HISTORY_LOOKBACK_DAYS,
+            )
+            filtered = self._normalize_and_limit_response(response, max_results=provider_max_results)
+            filtered = self._rank_news_response(
+                filtered,
+                stock_code=stock_code,
+                stock_name=stock_name,
+                prefer_chinese=prefer_chinese,
+                max_results=provider_max_results,
+                log_scope=f"{stock_code}:{provider.name}:history:{dim_name}:rank",
+            )
+            filtered = self._filter_ranked_news_for_context(
+                filtered,
+                log_scope=f"{stock_code}:{provider.name}:history:{dim_name}:admission",
+            )
+            results[dim_name] = self._limit_search_response(filtered, max_results=target_per_dimension)
+            if not response.success:
+                logger.warning("[公司历史检索] %s: 搜索失败 - %s", dim_name, response.error_message)
+            time.sleep(0.5)
+
+        return results
+
     def format_intel_report(self, intel_results: Dict[str, SearchResponse], stock_name: str) -> str:
         """
         格式化情报搜索结果为报告

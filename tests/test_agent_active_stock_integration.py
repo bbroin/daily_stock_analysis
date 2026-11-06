@@ -211,6 +211,7 @@ def test_convergence_builtin_asset_contracts_match_actual_factory():
         "get_volume_analysis": ("stock", "index"), "analyze_pattern": ("stock", "index"),
         "search_stock_news": ("stock", "index"), "search_comprehensive_intel": ("stock", "index"),
         "get_stock_backtest_summary": ("stock",),
+        "get_annual_financials": ("stock",), "search_company_history": ("stock",),
     }
     registry = get_tool_registry()
     # Inspect actual public tool list, not a copied registration fixture.

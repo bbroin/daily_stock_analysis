@@ -1,9 +1,11 @@
 name: 每日股票分析
 
 on:
-  # 定时触发 - 每天北京时间 18:00 (UTC 10:00)
+  # 定时触发 - 每月 1 日 UTC 06:30（悉尼 17:30 夏令时 / 16:30 标准时，ASX 收盘后），用于月度长期复盘
+  # 恢复每日运行：改回 '0 10 * * 1-5'（周一到周五，UTC 10:00 = 北京时间 18:00）
+  # 注意：月度运行若遇周末/假日会被交易日检查跳过，需设置 TRADING_DAY_CHECK_ENABLED=false
   schedule:
-    - cron: '0 10 * * 1-5'     # 周一到周五，UTC 10:00 = 北京时间 18:00
+    - cron: '30 6 1 * *'
   
   # 手动触发
   workflow_dispatch:
@@ -432,6 +434,13 @@ jobs:
           # ==========================================
           REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'simple' }}
           REPORT_LANGUAGE: ${{ vars.REPORT_LANGUAGE || secrets.REPORT_LANGUAGE || '' }}
+          # 分析策略（skill）与新闻时效；留空保持默认行为（bull_trend 基线 / 3 天新闻）
+          AGENT_SKILLS: ${{ vars.AGENT_SKILLS || secrets.AGENT_SKILLS || '' }}
+          NEWS_STRATEGY_PROFILE: ${{ vars.NEWS_STRATEGY_PROFILE || secrets.NEWS_STRATEGY_PROFILE || 'short' }}
+          NEWS_MAX_AGE_DAYS: ${{ vars.NEWS_MAX_AGE_DAYS || secrets.NEWS_MAX_AGE_DAYS || '3' }}
+          # 月度组合复盘：持仓只从 Secrets 读取（公开仓库的 Variables 可能出现在日志中）；留空则不启用
+          PORTFOLIO_REVIEW_HOLDINGS: ${{ secrets.PORTFOLIO_REVIEW_HOLDINGS }}
+          PORTFOLIO_REVIEW_CURRENCY: ${{ vars.PORTFOLIO_REVIEW_CURRENCY || secrets.PORTFOLIO_REVIEW_CURRENCY || 'AUD' }}
           REPORT_SHOW_LLM_MODEL: ${{ vars.REPORT_SHOW_LLM_MODEL || secrets.REPORT_SHOW_LLM_MODEL || 'true' }}
           SINGLE_STOCK_NOTIFY: ${{ vars.SINGLE_STOCK_NOTIFY || secrets.SINGLE_STOCK_NOTIFY || 'false' }}
           MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}
@@ -568,7 +577,7 @@ jobs:
           path: |
             reports/
             logs/
-          retention-days: 30
+          retention-days: 90
       
       - name: 显示运行结果
         if: always()

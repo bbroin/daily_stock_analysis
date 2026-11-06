@@ -1376,6 +1376,10 @@ class Config:
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
 
+    # === 月度组合复盘（PORTFOLIO_REVIEW_HOLDINGS 非空时启用）===
+    portfolio_review_holdings: str = ""
+    portfolio_review_currency: str = "AUD"
+
     # Discord 机器人状态
     discord_bot_status: str = "A股智能分析 | /help"
 
@@ -2458,6 +2462,8 @@ class Config:
                 minimum=1,
             ),
             portfolio_fx_update_enabled=os.getenv('PORTFOLIO_FX_UPDATE_ENABLED', 'true').lower() == 'true',
+            portfolio_review_holdings=(os.getenv('PORTFOLIO_REVIEW_HOLDINGS') or '').strip(),
+            portfolio_review_currency=((os.getenv('PORTFOLIO_REVIEW_CURRENCY') or '').strip().upper() or 'AUD'),
             screening_enabled=parse_env_bool(os.getenv('SCREENING_ENABLED'), default=False),
         )
     

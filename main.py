@@ -893,6 +893,48 @@ def _all_stock_targets_succeeded(
         return False
 
 
+def _run_portfolio_review(config: Config, pipeline: Any, results: List[Any], args: argparse.Namespace) -> None:
+    """Run the whole-portfolio review and push it as its own message.
+
+    Holdings are private: the review is sent through notification channels. It is
+    written to ``reports/`` only when notifications are disabled/unavailable AND the
+    run is not on GitHub Actions, because the workflow uploads ``reports/`` as a
+    downloadable artifact.
+    """
+    raw_holdings = getattr(config, "portfolio_review_holdings", "") or ""
+    if not raw_holdings.strip():
+        return
+    try:
+        from src.services.portfolio_review_service import run_portfolio_review
+
+        content = run_portfolio_review(
+            raw_holdings,
+            analyzer=getattr(pipeline, "analyzer", None),
+            results=results or [],
+            base_currency=getattr(config, "portfolio_review_currency", "AUD") or "AUD",
+            report_language=getattr(config, "report_language", "zh") or "zh",
+        )
+        if not content:
+            return
+        notifier = getattr(pipeline, "notifier", None)
+        if getattr(args, "no_notify", False) or notifier is None or not notifier.is_available():
+            if os.getenv("GITHUB_ACTIONS", "").lower() == "true":
+                # Actions uploads reports/ as an artifact; do not write private holdings there.
+                logger.warning("[PortfolioReview] 未配置可用通知渠道，GitHub Actions 中不落盘，组合复盘已跳过")
+                return
+            if notifier is not None:
+                date_str = datetime.now().strftime('%Y%m%d')
+                notifier.save_report_to_file(content, filename=f"portfolio_review_{date_str}.md")
+                logger.info("[PortfolioReview] 未推送，已保存到本地 reports/ 目录")
+            return
+        if notifier.send(content, email_send_to_all=True, route_type="report"):
+            logger.info("[PortfolioReview] 组合复盘已推送")
+        else:
+            logger.warning("[PortfolioReview] 组合复盘推送失败")
+    except Exception as exc:
+        logger.error("[PortfolioReview] 组合复盘失败（不影响个股分析）: %s", type(exc).__name__)
+
+
 def run_full_analysis(
     config: Config,
     args: argparse.Namespace,
@@ -1270,6 +1312,10 @@ def run_full_analysis(
                         logger.info("已合并推送（个股+大盘复盘）")
                     else:
                         logger.warning("合并推送失败")
+
+        # 月度组合复盘（PORTFOLIO_REVIEW_HOLDINGS 非空时启用，独立推送，失败不影响主流程）
+        if not getattr(args, "dry_run", False):
+            _run_portfolio_review(config, pipeline, results, args)
 
         # 输出摘要
         if results:

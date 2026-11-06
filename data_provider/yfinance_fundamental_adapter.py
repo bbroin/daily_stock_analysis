@@ -384,3 +384,168 @@ class YfinanceFundamentalAdapter:
         )
         result["status"] = "partial" if has_content else "not_supported"
         return result
+
+
+# ---------------------------------------------------------------------------
+# Multi-year annual statements (long-term investor view)
+# ---------------------------------------------------------------------------
+
+# (output_key, candidate yfinance row labels)
+_ANNUAL_INCOME_ROWS = (
+    ("revenue", _INCOME_REVENUE_KEYS),
+    ("gross_profit", ("Gross Profit",)),
+    ("operating_income", ("Operating Income", "Total Operating Income As Reported")),
+    ("net_income", _INCOME_NET_PROFIT_KEYS),
+    ("diluted_eps", ("Diluted EPS",)),
+)
+_ANNUAL_BALANCE_ROWS = (
+    ("total_assets", ("Total Assets",)),
+    ("total_liabilities", ("Total Liabilities Net Minority Interest", "Total Liab")),
+    ("shareholders_equity", ("Stockholders Equity", "Common Stock Equity", "Total Equity Gross Minority Interest")),
+    ("cash_and_equivalents", ("Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments")),
+    ("total_debt", ("Total Debt",)),
+    ("shares_outstanding", ("Ordinary Shares Number", "Share Issued")),
+)
+_ANNUAL_CASHFLOW_ROWS = (
+    ("operating_cash_flow", _CASHFLOW_OP_KEYS),
+    ("capital_expenditure", ("Capital Expenditure",)),
+    ("free_cash_flow", ("Free Cash Flow",)),
+    ("shares_issued_cash", ("Issuance Of Capital Stock", "Common Stock Issuance")),
+    ("dividends_paid", ("Cash Dividends Paid", "Common Stock Dividend Paid")),
+)
+
+
+def _statement_columns_desc(df: Optional[pd.DataFrame], max_years: int) -> List[Any]:
+    if df is None or getattr(df, "empty", True):
+        return []
+    cols = list(df.columns)
+    try:
+        cols = sorted(cols, key=lambda c: pd.to_datetime(c), reverse=True)
+    except (TypeError, ValueError):
+        pass
+    return cols[:max_years]
+
+
+def _period_label(col: Any) -> str:
+    ts = pd.to_datetime(col, errors="coerce")
+    if pd.notna(ts):
+        return ts.date().isoformat()
+    return str(col)
+
+
+def _extract_statement_rows(df: Optional[pd.DataFrame], rows, columns: List[Any]) -> Dict[str, Dict[str, Optional[float]]]:
+    out: Dict[str, Dict[str, Optional[float]]] = {}
+    for key, labels in rows:
+        row = _pick_row(df, labels)
+        if row is None:
+            continue
+        values = {_period_label(col): _safe_float(row.get(col)) for col in columns}
+        if any(v is not None for v in values.values()):
+            out[key] = values
+    return out
+
+
+def _pct_change(new: Optional[float], old: Optional[float]) -> Optional[float]:
+    if new is None or old in (None, 0):
+        return None
+    return round((new - old) / abs(old) * 100.0, 2)
+
+
+def build_annual_statements(ticker: Any, max_years: int = 4) -> Dict[str, Any]:
+    """Build a compact multi-year annual statement summary from a yfinance Ticker.
+
+    Returns per-period values (newest first) for key income / balance-sheet /
+    cash-flow lines plus a few derived long-term signals (revenue CAGR, share
+    count change = dilution, net debt). Missing rows are simply omitted; the
+    caller must not treat an omitted row as zero.
+    """
+    max_years = max(1, min(int(max_years or 4), 10))
+    result: Dict[str, Any] = {"status": "not_supported", "periods": [], "errors": []}
+
+    frames: Dict[str, Optional[pd.DataFrame]] = {}
+    for name, attr in (("income", "income_stmt"), ("balance", "balance_sheet"), ("cashflow", "cashflow")):
+        try:
+            frames[name] = getattr(ticker, attr)
+        except Exception as exc:
+            result["errors"].append(f"{attr}:{type(exc).__name__}")
+            frames[name] = None
+
+    income_cols = _statement_columns_desc(frames["income"], max_years)
+    balance_cols = _statement_columns_desc(frames["balance"], max_years)
+    cashflow_cols = _statement_columns_desc(frames["cashflow"], max_years)
+
+    income = _extract_statement_rows(frames["income"], _ANNUAL_INCOME_ROWS, income_cols)
+    balance = _extract_statement_rows(frames["balance"], _ANNUAL_BALANCE_ROWS, balance_cols)
+    cashflow = _extract_statement_rows(frames["cashflow"], _ANNUAL_CASHFLOW_ROWS, cashflow_cols)
+
+    if not (income or balance or cashflow):
+        return result
+
+    periods = [_period_label(c) for c in (income_cols or balance_cols or cashflow_cols)]
+    derived: Dict[str, Any] = {}
+
+    revenue = income.get("revenue") or {}
+    rev_points = [(p, v) for p, v in revenue.items() if v is not None]
+    if len(rev_points) >= 2:
+        (latest_p, latest_v), (oldest_p, oldest_v) = rev_points[0], rev_points[-1]
+        years = max(1, len(rev_points) - 1)
+        if oldest_v and oldest_v > 0 and latest_v is not None and latest_v > 0:
+            derived["revenue_cagr_pct"] = round(((latest_v / oldest_v) ** (1.0 / years) - 1.0) * 100.0, 2)
+        derived["revenue_change_window"] = f"{oldest_p} -> {latest_p}"
+
+    shares = balance.get("shares_outstanding") or {}
+    share_points = [(p, v) for p, v in shares.items() if v is not None]
+    if len(share_points) >= 2:
+        derived["share_count_change_pct"] = _pct_change(share_points[0][1], share_points[-1][1])
+        derived["share_count_change_window"] = f"{share_points[-1][0]} -> {share_points[0][0]}"
+
+    if balance_cols:
+        latest_balance = _period_label(balance_cols[0])
+        debt = (balance.get("total_debt") or {}).get(latest_balance)
+        cash = (balance.get("cash_and_equivalents") or {}).get(latest_balance)
+        if debt is not None and cash is not None:
+            derived["net_debt_latest"] = debt - cash
+
+    net_income = income.get("net_income") or {}
+    derived["loss_making_years"] = sum(1 for v in net_income.values() if v is not None and v < 0)
+
+    result.update(
+        {
+            "status": "ok",
+            "periods": periods,
+            "income_statement": income,
+            "balance_sheet": balance,
+            "cash_flow": cashflow,
+            "derived": derived,
+        }
+    )
+    return result
+
+
+def get_annual_statements(stock_code: str, max_years: int = 4) -> Dict[str, Any]:
+    """Fetch multi-year annual statements for a yfinance-supported symbol."""
+    try:
+        import yfinance as yf
+        from data_provider.yfinance_fetcher import YfinanceFetcher
+    except Exception as exc:
+        return {"status": "not_supported", "periods": [], "errors": [f"import:{type(exc).__name__}"]}
+
+    symbol = YfinanceFetcher()._convert_stock_code(stock_code or "")
+    if not symbol:
+        return {"status": "not_supported", "periods": [], "errors": ["empty_symbol"]}
+
+    ticker = yf.Ticker(symbol)
+    financial_currency: Optional[str] = None
+    try:
+        info = ticker.get_info() if hasattr(ticker, "get_info") else (ticker.info or {})
+        if isinstance(info, dict):
+            financial_currency = str(info.get("financialCurrency") or info.get("currency") or "").upper() or None
+    except Exception:
+        info = {}
+
+    result = build_annual_statements(ticker, max_years=max_years)
+    result["symbol"] = symbol
+    result["currency"] = financial_currency
+    result["source"] = "yfinance.annual_statements"
+    return result
+

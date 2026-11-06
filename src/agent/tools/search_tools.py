@@ -5,6 +5,7 @@ Search tools — wraps SearchService methods as agent-callable tools.
 Tools:
 - search_stock_news: search latest stock news
 - search_comprehensive_intel: multi-dimensional intelligence search
+- search_company_history: multi-year leadership / capital-allocation track record search
 """
 
 import logging
@@ -28,6 +29,13 @@ _INTEL_READ_POLICY = ToolPolicy.declared(
     permissions=["intel:read"],
     scope_dimensions=["stock"],
     supported_asset_types=("stock", "index"),
+)
+_HISTORY_READ_POLICY = ToolPolicy.declared(
+    read_only=True,
+    side_effects=["network_read"],
+    permissions=["intel:read"],
+    scope_dimensions=["stock"],
+    supported_asset_types=("stock",),
 )
 
 
@@ -262,7 +270,86 @@ search_comprehensive_intel_tool = ToolDefinition(
 )
 
 
+# ============================================================
+# search_company_history
+# ============================================================
+
+def _handle_search_company_history(stock_code: str, stock_name: str) -> dict:
+    """Multi-year leadership and strategic-decision track record search."""
+    service = _get_search_service()
+    query_code, query_name = _resolve_search_subject(stock_code, stock_name)
+
+    if not service.is_available:
+        return {"error": "No search engine available (no API keys configured)"}
+
+    history_results = service.search_company_history(
+        stock_code=query_code,
+        stock_name=query_name,
+    )
+    if not history_results:
+        return {
+            "error": "Company history search returned no results "
+                     "(index/ETF targets are not supported)",
+        }
+
+    dimensions = {}
+    for dim_name, response in history_results.items():
+        if not response or not response.success:
+            dimensions[dim_name] = {
+                "success": False,
+                "error": getattr(response, "error_message", None),
+            }
+            continue
+        dimensions[dim_name] = {
+            "query": response.query,
+            "results_count": len(response.results),
+            "results": [
+                {
+                    "title": r.title,
+                    "snippet": r.snippet,
+                    "source": r.source,
+                    "published_date": r.published_date,
+                }
+                for r in response.results
+            ],
+        }
+
+    return {
+        "lookback_note": (
+            "Results are not limited by the news freshness window. Most search "
+            "providers only cover roughly the last year; older history must come "
+            "from background knowledge and be labelled unverified."
+        ),
+        "dimensions": dimensions,
+    }
+
+
+search_company_history_tool = ToolDefinition(
+    name="search_company_history",
+    description="Search a company's multi-year track record: leadership and board changes, "
+                "acquisitions/takeovers/capital raisings, project delays/cost overruns/"
+                "impairments, and current strategy. Use for long-term investor reviews; "
+                "not limited by the news freshness window. Not for indices/ETFs.",
+    parameters=[
+        ToolParameter(
+            name="stock_code",
+            type="string",
+            description="Stock code, e.g., 'PDN.AX', 'AAPL', '600519'",
+        ),
+        ToolParameter(
+            name="stock_name",
+            type="string",
+            description="Company name, e.g., 'Paladin Energy'",
+        ),
+    ],
+    handler=_handle_search_company_history,
+    category="search",
+    policy=_HISTORY_READ_POLICY,
+)
+
+
 ALL_SEARCH_TOOLS = [
     search_stock_news_tool,
     search_comprehensive_intel_tool,
+    search_company_history_tool,
 ]

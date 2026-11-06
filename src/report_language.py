@@ -240,6 +240,9 @@ _STRATEGY_SKILL_CANONICAL_MAP = {
     "wave theory": "wave_theory",
     "wave_theory": "wave_theory",
     "波浪理论": "wave_theory",
+    "long term investor": "long_term_investor",
+    "long_term_investor": "long_term_investor",
+    "长期投资": "long_term_investor",
 }
 
 _STRATEGY_SKILL_TRANSLATIONS = {
@@ -258,6 +261,7 @@ _STRATEGY_SKILL_TRANSLATIONS = {
     "one_yang_three_yin": {"zh": "一阳三阴", "en": "One Yang Three Yin", "ko": "일양삼음"},
     "shrink_pullback": {"zh": "缩量回踩", "en": "Shrink Pullback", "ko": "거래량 축소 눌림"},
     "wave_theory": {"zh": "波浪理论", "en": "Wave Theory", "ko": "파동 이론"},
+    "long_term_investor": {"zh": "长期投资", "en": "Long-Term Investor", "ko": "장기 투자"},
 }
 
 _CHIP_HEALTH_CANONICAL_MAP = {
